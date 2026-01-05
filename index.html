@@ -53,6 +53,9 @@
     <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.min.js"></script>
     <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
     <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
     <style>
         body {
@@ -242,68 +245,223 @@
             return { points, ranks };
         };
 
-        // --- Store Implementation (Replacing Zustand) ---
+        // --- Store Implementation (Firestore) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g",
+            authDomain: "mahjongstorage-836e8.firebaseapp.com",
+            databaseURL: "https://mahjongstorage-836e8-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "mahjongstorage-836e8",
+            storageBucket: "mahjongstorage-836e8.firebasestorage.app",
+            messagingSenderId: "618604764916",
+            appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1",
+            measurementId: "G-FRPK9KGTDF"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
         const AppContext = createContext();
 
         const AppProvider = ({ children }) => {
-            const [state, setState] = useState(() => {
-                const saved = localStorage.getItem('mahjong-tracker-storage');
-                return saved ? JSON.parse(saved) : {
-                    groups: {},
-                    players: {},
-                    matches: {},
-                    currentGroupId: null,
-                    currentView: 'onboarding',
-                    viewParams: {}
-                };
+            const [state, setState] = useState({
+                groups: {},
+                players: {},
+                matches: {},
+                currentGroupId: null,
+                currentView: 'onboarding',
+                viewParams: {},
+                isLoading: true, // Start loading initially
+                isAuthenticated: false,
+                error: null
             });
 
+            // Auth Initialization
             useEffect(() => {
-                localStorage.setItem('mahjong-tracker-storage', JSON.stringify(state));
-            }, [state]);
+                const unsubscribe = auth.onAuthStateChanged(user => {
+                    if (user) {
+                        console.log("Authenticated as:", user.uid);
+                        setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
+                    } else {
+                        console.log("Signing in anonymously...");
+                        auth.signInAnonymously().catch(error => {
+                            console.error("Auth Error:", error);
+                            setState(s => ({ ...s, error: "Authentication failed: " + error.message, isLoading: false }));
+                        });
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Persist currentGroupId
+            useEffect(() => {
+                const savedGroupId = localStorage.getItem('mahjong_current_group_id');
+                if (savedGroupId) {
+                    setState(s => ({ ...s, currentGroupId: savedGroupId }));
+                }
+            }, []);
+
+            useEffect(() => {
+                if (state.currentGroupId) {
+                    localStorage.setItem('mahjong_current_group_id', state.currentGroupId);
+                } else {
+                    localStorage.removeItem('mahjong_current_group_id');
+                }
+            }, [state.currentGroupId]);
+
+            // Firestore Listeners - ONLY runs when authenticated and groupId exists
+            useEffect(() => {
+                if (!state.isAuthenticated || !state.currentGroupId) return;
+
+                const groupId = state.currentGroupId;
+                setState(s => ({ ...s, isLoading: true }));
+
+                // 1. Group Metadata Listener
+                const unsubscribeGroup = db.collection('groups').doc(groupId).onSnapshot(doc => {
+                    if (doc.exists) {
+                        setState(s => ({
+                            ...s,
+                            groups: { ...s.groups, [groupId]: doc.data() },
+                            currentView: s.currentView === 'onboarding' ? 'dashboard' : s.currentView, // Auto switch to dashboard if data loaded
+                            isLoading: false
+                        }));
+                    } else {
+                        setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', error: 'Group not found', isLoading: false }));
+                    }
+                }, err => {
+                    console.error("Group Listener Error:", err);
+                    setState(s => ({ ...s, isLoading: false })); // Stop loading on error
+                });
+
+                // 2. Players Listener
+                const unsubscribePlayers = db.collection('groups').doc(groupId).collection('players').onSnapshot(snapshot => {
+                    const players = {};
+                    snapshot.forEach(doc => players[doc.id] = doc.data());
+                    setState(s => ({ ...s, players }));
+                }, err => console.error("Players Listener Error:", err));
+
+                // 3. Matches Listener
+                const unsubscribeMatches = db.collection('groups').doc(groupId).collection('matches').onSnapshot(snapshot => {
+                    const matches = {};
+                    snapshot.forEach(doc => matches[doc.id] = doc.data());
+                    setState(s => ({ ...s, matches }));
+                }, err => console.error("Matches Listener Error:", err));
+
+                return () => {
+                    unsubscribeGroup();
+                    unsubscribePlayers();
+                    unsubscribeMatches();
+                };
+            }, [state.currentGroupId, state.isAuthenticated]);
 
             const actions = {
-                createGroup: (name, passkey, rules) => {
+                createGroup: async (name, passkey, rules) => {
+                    const user = firebase.auth().currentUser;
+                    if (!user) {
+                        alert("認証情報の取得中またはエラーです。しばらく待ってください。");
+                        return;
+                    }
                     const id = uuidv4();
-                    const newGroup = { id, name, passkey, rules, createdAt: Date.now() };
-                    setState(s => ({ ...s, groups: { ...s.groups, [id]: newGroup }, currentGroupId: id, currentView: 'dashboard' }));
-                    return id;
-                },
-                updateGroupRules: (groupId, rules) => {
-                    setState(s => ({ ...s, groups: { ...s.groups, [groupId]: { ...s.groups[groupId], rules } } }));
-                },
-                joinGroup: (id, passkey) => {
-                    const group = state.groups[id];
-                    if (group && group.passkey === passkey) {
+                    const newGroup = {
+                        id,
+                        name,
+                        passkey,
+                        rules,
+                        createdAt: Date.now(),
+                        userId: user.uid
+                    };
+                    try {
+                        await db.collection('groups').doc(id).set(newGroup);
                         setState(s => ({ ...s, currentGroupId: id, currentView: 'dashboard' }));
-                        return true;
+                        return id;
+                    } catch (e) {
+                        alert("グループ作成失敗: " + e.message + "\n権限エラーの場合は、しばらく待ってから再試行してください。");
+                        console.error(e);
+                    }
+                },
+                updateGroupRules: async (groupId, rules) => {
+                    try {
+                        await db.collection('groups').doc(groupId).update({ rules });
+                    } catch (e) {
+                        alert("Error updating rules: " + e.message);
+                    }
+                },
+                joinGroup: async (id, passkey) => {
+                    try {
+                        const doc = await db.collection('groups').doc(id).get();
+                        if (doc.exists) {
+                            const group = doc.data();
+                            if (group.passkey === passkey) {
+                                setState(s => ({ ...s, currentGroupId: id, currentView: 'dashboard' }));
+                                return true;
+                            } else {
+                                alert("合言葉が間違っています");
+                            }
+                        } else {
+                            alert("グループが見つかりません");
+                        }
+                    } catch (e) {
+                        alert("Error joining group: " + e.message);
                     }
                     return false;
                 },
-                addPlayer: (name) => {
+                addPlayer: async (name) => {
                     if (!state.currentGroupId) return;
+                    const user = firebase.auth().currentUser;
                     const id = uuidv4();
-                    const newPlayer = { id, name, groupId: state.currentGroupId, joinedAt: Date.now() };
-                    setState(s => ({ ...s, players: { ...s.players, [id]: newPlayer } }));
-                    return id;
+                    const newPlayer = {
+                        id,
+                        name,
+                        groupId: state.currentGroupId,
+                        joinedAt: Date.now(),
+                        userId: user ? user.uid : null
+                    };
+                    try {
+                        await db.collection('groups').doc(state.currentGroupId).collection('players').doc(id).set(newPlayer);
+                        return id;
+                    } catch (e) {
+                        console.error(e);
+                    }
                 },
-                addMatch: (matchData) => {
+                addMatch: async (matchData) => {
+                    if (!state.currentGroupId) return;
+                    const user = firebase.auth().currentUser;
                     const id = uuidv4();
-                    const newMatch = { ...matchData, id, timestamp: matchData.timestamp || Date.now() };
-                    setState(s => ({ ...s, matches: { ...s.matches, [id]: newMatch } }));
+                    const newMatch = {
+                        ...matchData,
+                        id,
+                        timestamp: matchData.timestamp || Date.now(),
+                        userId: user ? user.uid : null
+                    };
+                    try {
+                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).set(newMatch);
+                    } catch (e) {
+                        console.error(e);
+                    }
                 },
-                editMatch: (id, matchData) => {
-                    setState(s => ({ ...s, matches: { ...s.matches, [id]: { ...state.matches[id], ...matchData } } }));
+                editMatch: async (id, matchData) => {
+                    if (!state.currentGroupId) return;
+                    // Preserve timestamp if not provided, else update
+                    try {
+                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).update(matchData);
+                    } catch (e) {
+                        console.error(e);
+                    }
                 },
-                deleteMatch: (id) => {
-                    const newMatches = { ...state.matches };
-                    delete newMatches[id];
-                    setState(s => ({ ...s, matches: newMatches }));
+                deleteMatch: async (id) => {
+                    if (!state.currentGroupId) return;
+                    try {
+                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).delete();
+                    } catch (e) {
+                        console.error(e);
+                    }
                 },
                 navigate: (view, params = {}) => setState(s => ({ ...s, currentView: view, viewParams: params })),
-                leaveGroup: () => setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding' })),
-                getGroupPlayers: (groupId) => Object.values(state.players).filter(p => p.groupId === groupId),
-                getGroupMatches: (groupId) => Object.values(state.matches).filter(m => m.groupId === groupId).sort((a, b) => b.timestamp - a.timestamp)
+                leaveGroup: () => setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', groups: {}, players: {}, matches: {} })),
+                getGroupPlayers: (groupId) => Object.values(state.players), // Filtered by listener already
+                getGroupMatches: (groupId) => Object.values(state.matches).sort((a, b) => b.timestamp - a.timestamp)
             };
 
             return <AppContext.Provider value={{ ...state, ...actions }}>{children}</AppContext.Provider>;
@@ -1391,6 +1549,70 @@
 
                     <section className="space-y-3">
                         <div className="flex items-center gap-2 mb-2">
+                            <Icons.CloudUpload size={18} className="text-emerald-500" />
+                            <h3 className="font-bold text-sm">クラウド移行 (New)</h3>
+                        </div>
+                        <Card className="p-4 border-emerald-100 bg-emerald-50/30">
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                                    現在ブラウザに保存されているデータを、新しいクラウドデータベースへアップロードします。
+                                </p>
+                                <Button className="w-full h-12" onClick={async () => {
+                                    if (!confirm("現在のデータをクラウドへ移行しますか？\n（Next.js版アプリへデータを引き継ぎます）")) return;
+
+                                    try {
+                                        const firebaseConfig = {
+                                            apiKey: "9cd51b93f21a2451d7c29342db55cb18842b76df",
+                                            authDomain: "mahjong@mahjongstorage-836e8.iam.gserviceaccount.com",
+                                            projectId: "mahjongstorage-836e8",
+                                            storageBucket: "your_project_id.appspot.com",
+                                            messagingSenderId: "618604764916",
+                                            appId: "1:618604764916:web:9ca128c3e76a7cb3e248a"
+                                        };
+
+                                        if (!firebase.apps.length) {
+                                            firebase.initializeApp(firebaseConfig);
+                                        }
+                                        const db = firebase.firestore();
+
+                                        const rawData = localStorage.getItem('mahjong-tracker-storage');
+                                        if (!rawData) {
+                                            alert("移行するデータが見つかりません。");
+                                            return;
+                                        }
+                                        const data = JSON.parse(rawData);
+
+                                        // 1. Groups
+                                        const groupPromises = Object.values(data.groups || {}).map(async (group) => {
+                                            await db.collection('groups').doc(group.id).set(group);
+
+                                            // 2. Players for this group
+                                            const groupPlayers = Object.values(data.players || {}).filter(p => p.groupId === group.id);
+                                            for (const player of groupPlayers) {
+                                                await db.collection('groups').doc(group.id).collection('players').doc(player.id).set(player);
+                                            }
+
+                                            // 3. Matches for this group
+                                            const groupMatches = Object.values(data.matches || {}).filter(m => m.groupId === group.id);
+                                            for (const match of groupMatches) {
+                                                await db.collection('groups').doc(group.id).collection('matches').doc(match.id).set(match);
+                                            }
+                                        });
+
+                                        await Promise.all(groupPromises);
+                                        alert("クラウドへの移行が完了しました！\nNext.js版アプリを開いて確認してください。");
+
+                                    } catch (e) {
+                                        console.error(e);
+                                        alert("移行に失敗しました: " + e.message);
+                                    }
+                                }}>今すぐデータを移行する</Button>
+                            </div>
+                        </Card>
+                    </section>
+
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
                             <LogIn size={18} className="text-blue-400 rotate-180" />
                             <h3 className="font-bold text-sm">グループ管理</h3>
                         </div>
@@ -1433,6 +1655,13 @@
                     </section>
 
                     <Button variant="secondary" className="w-full h-12" onClick={() => navigate('dashboard')}>戻る</Button>
+
+                    {/* Debug Info Footer */}
+                    <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-400 font-mono text-center">
+                        <p>App ID: {firebaseConfig.projectId}</p>
+                        <p>Auth Status: {isAuthenticated ? `Logged In (${firebase.auth().currentUser?.uid?.slice(0, 6)}...)` : 'Not Logged In'}</p>
+                        <p>Current Group: {group?.id ? group.id.slice(0, 8) + '...' : 'None'}</p>
+                    </div>
                 </div>
             );
         };
