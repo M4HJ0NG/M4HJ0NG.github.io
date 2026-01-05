@@ -316,6 +316,22 @@
                 if (!state.isAuthenticated || !state.currentGroupId) return;
 
                 const groupId = state.currentGroupId;
+
+                // Track initialization of each listener
+                let loaded = { group: false, players: false, matches: false };
+
+                // Helper to update global loading state
+                const checkLoading = () => {
+                    if (loaded.group && loaded.players && loaded.matches) {
+                        setState(s => ({
+                            ...s,
+                            isLoading: false,
+                            // Only switch to dashboard if we are still onboarding
+                            currentView: s.currentView === 'onboarding' ? 'dashboard' : s.currentView
+                        }));
+                    }
+                };
+
                 setState(s => ({ ...s, isLoading: true }));
 
                 // 1. Group Metadata Listener
@@ -323,16 +339,16 @@
                     if (doc.exists) {
                         setState(s => ({
                             ...s,
-                            groups: { ...s.groups, [groupId]: doc.data() },
-                            currentView: s.currentView === 'onboarding' ? 'dashboard' : s.currentView, // Auto switch to dashboard if data loaded
-                            isLoading: false
+                            groups: { ...s.groups, [groupId]: doc.data() }
                         }));
+                        loaded.group = true;
+                        checkLoading();
                     } else {
                         setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', error: 'Group not found', isLoading: false }));
                     }
                 }, err => {
                     console.error("Group Listener Error:", err);
-                    setState(s => ({ ...s, isLoading: false })); // Stop loading on error
+                    setState(s => ({ ...s, isLoading: false }));
                 });
 
                 // 2. Players Listener
@@ -340,6 +356,8 @@
                     const players = {};
                     snapshot.forEach(doc => players[doc.id] = doc.data());
                     setState(s => ({ ...s, players }));
+                    loaded.players = true;
+                    checkLoading();
                 }, err => console.error("Players Listener Error:", err));
 
                 // 3. Matches Listener
@@ -347,6 +365,8 @@
                     const matches = {};
                     snapshot.forEach(doc => matches[doc.id] = doc.data());
                     setState(s => ({ ...s, matches }));
+                    loaded.matches = true;
+                    checkLoading();
                 }, err => console.error("Matches Listener Error:", err));
 
                 return () => {
@@ -374,7 +394,8 @@
                     };
                     try {
                         await db.collection('groups').doc(id).set(newGroup);
-                        setState(s => ({ ...s, currentGroupId: id, currentView: 'dashboard' }));
+                        // Let the listener handle the view switch
+                        setState(s => ({ ...s, currentGroupId: id, isLoading: true }));
                         return id;
                     } catch (e) {
                         alert("グループ作成失敗: " + e.message + "\n権限エラーの場合は、しばらく待ってから再試行してください。");
@@ -390,6 +411,7 @@
                 },
                 joinGroup: async (name, passkey) => {
                     const cleanName = name.trim();
+                    setState(s => ({ ...s, isLoading: true })); // Start loading immediately
                     try {
                         // Search by Name instead of ID
                         const snapshot = await db.collection('groups').where('name', '==', cleanName).limit(1).get();
@@ -398,17 +420,21 @@
                             const doc = snapshot.docs[0];
                             const group = doc.data();
                             if (group.passkey === passkey) {
-                                setState(s => ({ ...s, currentGroupId: doc.id, currentView: 'dashboard' }));
+                                // Set ID and let listener take over. Do NOT force dashboard view yet.
+                                setState(s => ({ ...s, currentGroupId: doc.id }));
                                 return true;
                             } else {
                                 alert("合言葉が間違っています");
+                                setState(s => ({ ...s, isLoading: false }));
                             }
                         } else {
                             alert(`グループ「${cleanName}」が見つかりません。\n名前が正しいか確認してください。`);
+                            setState(s => ({ ...s, isLoading: false }));
                         }
                     } catch (e) {
                         alert("参加エラー: " + e.message);
                         console.error(e);
+                        setState(s => ({ ...s, isLoading: false }));
                     }
                     return false;
                 },
