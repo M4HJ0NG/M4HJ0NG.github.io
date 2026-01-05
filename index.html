@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Mahjong Tracker</title>
+    <!-- Tailwind Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#10b981',
+                            foreground: '#ffffff',
+                        },
+                        secondary: {
+                            DEFAULT: '#f3f4f6',
+                            foreground: '#1f2937',
+                        },
+                        destructive: {
+                            DEFAULT: '#ef4444',
+                            foreground: '#ffffff',
+                        },
+                        muted: {
+                            DEFAULT: '#f3f4f6',
+                            foreground: '#6b7280',
+                        },
+                        accent: {
+                            DEFAULT: '#f3f4f6',
+                            foreground: '#1f2937',
+                        },
+                    },
+                    borderRadius: {
+                        'xl': '1rem',
+                        '2xl': '1.5rem',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap"
+        rel="stylesheet">
+    <!-- Load Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.min.js"></script>
+    <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
+    <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            border-radius: 1rem;
+        }
+
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="root">
+        <div class="flex items-center justify-center min-h-screen">
+            <div id="loading-spinner" class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+            <div id="error-display"
+                class="hidden p-4 bg-red-50 text-red-600 rounded-lg max-w-md text-sm border border-red-200"></div>
+        </div>
+    </div>
+
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            const display = document.getElementById('error-display');
+            const spinner = document.getElementById('loading-spinner');
+            if (display) {
+                display.classList.remove('hidden');
+                display.innerText = "Error: " + msg + "\nLine: " + line;
+                if (spinner) spinner.classList.add('hidden');
+            }
+            return false;
+        };
+    </script>
+
+    <script type="text/babel">
+        const uuidv4 = () => {
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        };
+
+        const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
+
+        // --- Lucide Icon Wrapper ---
+        // The UMD build of lucide returns raw data. We need to convert it to React elements.
+        const LucideIcon = ({ icon, size = 24, className = "", ...props }) => {
+            if (!icon || !Array.isArray(icon)) return null;
+
+            const renderElement = (el, key) => {
+                const [tag, attrs, children] = el;
+                return React.createElement(
+                    tag,
+                    { ...attrs, key },
+                    Array.isArray(children) ? children.map((child, i) => renderElement(child, i)) : null
+                );
+            };
+
+            return (
+                <svg
+                    width={size}
+                    height={size}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={className}
+                    {...props}
+                >
+                    {icon.map((child, i) => renderElement(child, i))}
+                </svg>
+            );
+        };
+
+        const Icons = {};
+        if (typeof lucide !== 'undefined') {
+            Object.keys(lucide).forEach(key => {
+                if (Array.isArray(lucide[key])) {
+                    Icons[key] = (props) => <LucideIcon icon={lucide[key]} {...props} />;
+                }
+            });
+        }
+
+        const {
+            LayoutDashboard, History, BarChart2, Settings, PlusCircle,
+            TrendingUp, BarChart3, Download, Save, UserPlus, AlertCircle,
+            Calendar, Trophy, Plus, LogIn, FileText
+        } = Icons;
+
+        // --- Basic check for Recharts ---
+        if (typeof Recharts === 'undefined') {
+            window.Recharts = {
+                ResponsiveContainer: ({ children }) => <div>{children}</div>,
+                LineChart: () => null, Line: () => null, XAxis: () => null, YAxis: () => null,
+                BarChart: () => null, Bar: () => null,
+                CartesianGrid: () => null, Tooltip: () => null, Legend: () => null
+            };
+        }
+
+        // --- Utils & Presets ---
+        const PRESETS = {
+            M_LEAGUE: {
+                gameType: '4ma',
+                matchType: 'half',
+                uma: [50, 10, -10, -30],
+                oka: 0,
+                initialPoints: 25000,
+                returnPoints: 30000,
+                tieBreak: 'priority'
+            },
+            NET_MAHJONG: {
+                gameType: '4ma',
+                matchType: 'half',
+                uma: [20, 10, -10, -20],
+                oka: 0,
+                initialPoints: 25000,
+                returnPoints: 30000,
+                tieBreak: 'split'
+            }
+        };
+
+        const calculatePoints = (scores, rule) => {
+            const { uma, oka, initialPoints, returnPoints, gameType, tieBreak } = rule;
+            const numPlayers = gameType === '4ma' ? 4 : 3;
+
+            const indexed = scores.map((s, i) => ({ s, i }));
+            indexed.sort((a, b) => {
+                if (b.s !== a.s) return b.s - a.s;
+                return tieBreak === 'priority' ? a.i - b.i : 0;
+            });
+
+            const ranks = new Array(numPlayers).fill(0);
+            if (tieBreak === 'split') {
+                let currentRank = 1;
+                for (let i = 0; i < indexed.length; i++) {
+                    if (i > 0 && indexed[i].s < indexed[i - 1].s) currentRank = i + 1;
+                    ranks[indexed[i].i] = currentRank;
+                }
+            } else {
+                indexed.forEach((item, i) => { ranks[item.i] = i + 1; });
+            }
+
+            const points = scores.map((score, index) => {
+                const rank = ranks[index];
+                let p = (score - returnPoints) / 1000;
+
+                if (tieBreak === 'split') {
+                    const tieCount = ranks.filter(r => r === rank).length;
+                    if (tieCount > 1) {
+                        const startIndex = ranks.indexOf(rank);
+                        let totalUma = 0;
+                        for (let i = 0; i < tieCount; i++) totalUma += (uma[startIndex + i] || 0);
+                        p += (totalUma / tieCount);
+                    } else {
+                        p += (uma[rank - 1] || 0);
+                    }
+                } else {
+                    p += (uma[rank - 1] || 0);
+                }
+
+                if (rank === 1) {
+                    const firstPlaceTieCount = ranks.filter(r => r === 1).length;
+                    p += (oka / 1000) / firstPlaceTieCount;
+                }
+                return parseFloat(p.toFixed(1));
+            });
+
+            return { points, ranks };
+        };
+
+        // --- Store Implementation (Replacing Zustand) ---
+        const AppContext = createContext();
+
+        const AppProvider = ({ children }) => {
+            const [state, setState] = useState(() => {
+                const saved = localStorage.getItem('mahjong-tracker-storage');
+                return saved ? JSON.parse(saved) : {
+                    groups: {},
+                    players: {},
+                    matches: {},
+                    currentGroupId: null,
+                    currentView: 'onboarding',
+                    viewParams: {}
+                };
+            });
+
+            useEffect(() => {
+                localStorage.setItem('mahjong-tracker-storage', JSON.stringify(state));
+            }, [state]);
+
+            const actions = {
+                createGroup: (name, passkey, rules) => {
+                    const id = uuidv4();
+                    const newGroup = { id, name, passkey, rules, createdAt: Date.now() };
+                    setState(s => ({ ...s, groups: { ...s.groups, [id]: newGroup }, currentGroupId: id, currentView: 'dashboard' }));
+                    return id;
+                },
+                updateGroupRules: (groupId, rules) => {
+                    setState(s => ({ ...s, groups: { ...s.groups, [groupId]: { ...s.groups[groupId], rules } } }));
+                },
+                joinGroup: (id, passkey) => {
+                    const group = state.groups[id];
+                    if (group && group.passkey === passkey) {
+                        setState(s => ({ ...s, currentGroupId: id, currentView: 'dashboard' }));
+                        return true;
+                    }
+                    return false;
+                },
+                addPlayer: (name) => {
+                    if (!state.currentGroupId) return;
+                    const id = uuidv4();
+                    const newPlayer = { id, name, groupId: state.currentGroupId, joinedAt: Date.now() };
+                    setState(s => ({ ...s, players: { ...s.players, [id]: newPlayer } }));
+                    return id;
+                },
+                addMatch: (matchData) => {
+                    const id = uuidv4();
+                    const newMatch = { ...matchData, id, timestamp: matchData.timestamp || Date.now() };
+                    setState(s => ({ ...s, matches: { ...s.matches, [id]: newMatch } }));
+                },
+                editMatch: (id, matchData) => {
+                    setState(s => ({ ...s, matches: { ...s.matches, [id]: { ...state.matches[id], ...matchData } } }));
+                },
+                deleteMatch: (id) => {
+                    const newMatches = { ...state.matches };
+                    delete newMatches[id];
+                    setState(s => ({ ...s, matches: newMatches }));
+                },
+                navigate: (view, params = {}) => setState(s => ({ ...s, currentView: view, viewParams: params })),
+                leaveGroup: () => setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding' })),
+                getGroupPlayers: (groupId) => Object.values(state.players).filter(p => p.groupId === groupId),
+                getGroupMatches: (groupId) => Object.values(state.matches).filter(m => m.groupId === groupId).sort((a, b) => b.timestamp - a.timestamp)
+            };
+
+            return <AppContext.Provider value={{ ...state, ...actions }}>{children}</AppContext.Provider>;
+        };
+
+        const useStore = () => useContext(AppContext);
+
+        // --- Elements ---
+        const Button = ({ children, variant = "primary", className = "", size = "md", ...props }) => {
+            const variants = { primary: 'bg-emerald-500 text-white', secondary: 'bg-gray-200 text-gray-800', outline: 'border border-gray-300', ghost: 'hover:bg-gray-100' };
+            const sizes = { sm: 'h-8 px-3 text-xs', md: 'h-10 px-4', lg: 'h-12 px-6 text-lg font-bold' };
+            return <button className={`inline-flex items-center justify-center rounded-xl font-medium transition-all ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+        };
+        const Card = ({ children, className = "" }) => <div className={`glass-card p-4 ${className}`}>{children}</div>;
+        const Input = ({ className = "", ...props }) => <input className={`flex h-10 w-full rounded-lg border px-3 text-sm focus:ring-emerald-500 ${className}`} {...props} />;
+        const Badge = ({ children, variant = "secondary" }) => <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${variant === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100'}`}>{children}</span>;
+
+        const Layout = ({ children, hideNav }) => {
+            const { currentView, currentGroupId, groups, navigate } = useStore();
+            const group = groups[currentGroupId];
+            return (
+                <div className="flex flex-col min-h-screen">
+                    <header className="sticky top-0 z-40 w-full glass border-b px-4 h-16 flex items-center justify-between">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(currentGroupId ? 'dashboard' : 'onboarding')}>
+                            <span className="font-black text-xl tracking-tighter text-emerald-500">MAHJONG <span className="text-gray-900">TRACKER</span></span>
+                            {group && <Badge>{group.name}</Badge>}
+                        </div>
+                        {group && (
+                            <div className="flex flex-col items-end text-[10px] text-gray-500 font-bold leading-tight">
+                                <div>{group.rules.uma.join('/')} / オカ {group.rules.oka.toLocaleString()}</div>
+                                <div className="flex gap-2">
+                                    <span>{group.rules.gameType === '4ma' ? '4人' : '3人'}</span>
+                                    <span>{group.rules.matchType === 'half' ? '半荘' : '東風'}</span>
+                                    <button onClick={() => navigate('settings')} className="text-emerald-500 underline ml-1">設定</button>
+                                </div>
+                            </div>
+                        )}
+                    </header>
+                    <main className="flex-1 pb-24">{children}</main>
+                    {!hideNav && currentGroupId && (
+                        <nav className="fixed bottom-0 left-0 w-full h-16 glass border-t flex items-center justify-around pb-safe z-50">
+                            <button onClick={() => navigate('dashboard')} className={currentView === 'dashboard' ? 'text-emerald-500' : 'text-gray-400'}><LayoutDashboard size={20} /></button>
+                            <button onClick={() => navigate('history')} className={currentView === 'history' ? 'text-emerald-500' : 'text-gray-400'}><History size={20} /></button>
+                            <button onClick={() => navigate('newMatch')} className="relative -top-3 bg-emerald-500 p-4 rounded-full text-white shadow-xl hover:scale-105 active:scale-95 transition-transform"><Plus size={24} /></button>
+                            <button onClick={() => navigate('analytics')} className={currentView === 'analytics' ? 'text-emerald-500' : 'text-gray-400'}><BarChart2 size={20} /></button>
+                            <button onClick={() => navigate('settings')} className={currentView === 'settings' ? 'text-emerald-500' : 'text-gray-400'}><Settings size={20} /></button>
+                        </nav>
+                    )}
+                </div>
+            );
+        };
+
+        const RuleForm = ({ initialRules, onSubmit, onCancel, submitLabel = "保存" }) => {
+            const [rules, setRules] = useState(initialRules || PRESETS.M_LEAGUE);
+            const updateUma = (idx, val) => {
+                const newUma = [...rules.uma];
+                newUma[idx] = parseInt(val) || 0;
+                setRules({ ...rules, uma: newUma });
+            };
+            return (
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button type="button" variant={rules.gameType === '4ma' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, gameType: '4ma', uma: [50, 10, -10, -30] })}>4人打ち</Button>
+                        <Button type="button" variant={rules.gameType === '3ma' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, gameType: '3ma', uma: [30, 0, -30] })}>3人打ち</Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <Button type="button" variant={rules.matchType === 'half' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, matchType: 'half', initialPoints: 25000, returnPoints: 30000, oka: 0 })}>半荘</Button>
+                        <Button type="button" variant={rules.matchType === 'east' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, matchType: 'east', initialPoints: 20000, returnPoints: 25000, oka: 0 })}>東風</Button>
+                    </div>
+                    <div className="space-y-2">
+                        <span className="text-[10px] font-bold text-gray-400">ウマ (1位 / 2位 / 3位 / 4位)</span>
+                        <div className="flex gap-2">
+                            {rules.uma.map((u, i) => (
+                                <Input key={i} type="number" value={u} onChange={e => updateUma(i, e.target.value)} className="text-center p-1" />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-gray-400">オカ (合計)</span>
+                            <Input type="number" value={rules.oka} onChange={e => setRules({ ...rules, oka: parseInt(e.target.value) || 0 })} />
+                        </div>
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-gray-400">返り点</span>
+                            <Input type="number" value={rules.returnPoints} onChange={e => setRules({ ...rules, returnPoints: parseInt(e.target.value) || 0 })} />
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-[10px] font-bold text-gray-400">同点時の順位</span>
+                        <select className="w-full h-10 border rounded-lg text-sm px-2" value={rules.tieBreak} onChange={e => setRules({ ...rules, tieBreak: e.target.value })}>
+                            <option value="priority">起家に近い順</option>
+                            <option value="split">分け (等分)</option>
+                        </select>
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                        {onCancel && <Button variant="secondary" className="flex-1" onClick={onCancel}>キャンセル</Button>}
+                        <Button className="flex-1" onClick={() => onSubmit(rules)}>{submitLabel}</Button>
+                    </div>
+                </div>
+            );
+        };
+
+        const OnboardingView = () => {
+            const { createGroup, joinGroup } = useStore();
+            const [tab, setTab] = useState('join');
+            const [name, setName] = useState('');
+            const [id, setId] = useState('');
+            const [pass, setPass] = useState('');
+            const [showRules, setShowRules] = useState(false);
+            const [rules, setRules] = useState(PRESETS.M_LEAGUE);
+
+            return (
+                <div className="p-6 pt-12 max-w-md mx-auto space-y-8">
+                    <h1 className="text-4xl font-black text-center">対局を、<br /><span className="text-emerald-500">もっと美しく。</span></h1>
+                    <Card className="p-1">
+                        <div className="flex bg-gray-100 p-1 rounded-lg">
+                            <button onClick={() => setTab('join')} className={`flex-1 py-2 text-sm font-bold ${tab === 'join' ? 'bg-white shadow-sm' : ''}`}>参加</button>
+                            <button onClick={() => setTab('create')} className={`flex-1 py-2 text-sm font-bold ${tab === 'create' ? 'bg-white shadow-sm' : ''}`}>作成</button>
+                        </div>
+                        <div className="p-4 pt-6">
+                            {tab === 'join' ? (
+                                <form className="space-y-4" onSubmit={e => { e.preventDefault(); if (!joinGroup(id, pass)) alert("Error"); }}>
+                                    <Input value={id} onChange={e => setId(e.target.value)} placeholder="グループID" />
+                                    <Input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="合言葉" />
+                                    <Button type="submit" className="w-full h-12">グループに入る</Button>
+                                </form>
+                            ) : (
+                                <div className="space-y-4">
+                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="グループ名" />
+                                    <Input value={pass} onChange={e => setPass(e.target.value)} placeholder="合言葉" />
+
+                                    {!showRules ? (
+                                        <div className="space-y-3">
+                                            <div className="text-[10px] text-gray-400 font-bold px-1">基本設定: {rules.gameType === '4ma' ? '4人' : '3人'} / {rules.matchType === 'half' ? '半荘' : '東風'}</div>
+                                            <Button variant="outline" className="w-full text-xs" onClick={() => setShowRules(true)}>ルール詳細を設定する</Button>
+                                            <Button className="w-full h-12" onClick={() => createGroup(name, pass, rules)}>新規作成</Button>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-gray-50 p-3 rounded-lg border">
+                                            <h4 className="text-xs font-bold mb-3 border-b pb-1">ルール詳細設定</h4>
+                                            <RuleForm initialRules={rules} onSubmit={(r) => { setRules(r); setShowRules(false); }} onCancel={() => setShowRules(false)} submitLabel="反映して戻る" />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+            );
+        };
+
+        const DashboardView = () => {
+            const { currentGroupId, groups, getGroupPlayers, getGroupMatches, players: allPlayers, navigate } = useStore();
+            const group = groups[currentGroupId];
+            const players = getGroupPlayers(currentGroupId);
+            const matches = getGroupMatches(currentGroupId);
+
+            if (!group) return null;
+
+            const ranking = useMemo(() => {
+                const s = {};
+                players.forEach(p => s[p.id] = { id: p.id, name: p.name, points: 0, count: 0 });
+                matches.forEach(m => m.players.forEach((pid, i) => { if (s[pid]) { s[pid].points += m.points[i]; s[pid].count++; } }));
+                return Object.values(s).sort((a, b) => b.points - a.points);
+            }, [players, matches]);
+
+            return (
+                <div className="p-4 space-y-6 max-w-2xl mx-auto pb-32">
+                    <div className="flex justify-between items-end">
+                        <h2 className="text-3xl font-black">{group.name}</h2>
+                        <span className="text-[10px] font-bold text-gray-400">ID: {group.id}</span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                        <Card className="text-center py-4"><div className="text-xl font-black">{matches.length}</div><span className="text-[8px] text-gray-400 font-bold">対局数</span></Card>
+                        <Card className="text-center py-4"><div className="text-xl font-black">{players.length}</div><span className="text-[8px] text-gray-400 font-bold">人数</span></Card>
+                        <Card className="text-center py-4" onClick={() => navigate('analytics')}><div className="text-xl font-black text-emerald-500"><TrendingUp size={20} className="mx-auto" /></div><span className="text-[8px] text-gray-400 font-bold">分析</span></Card>
+                    </div>
+
+                    <section className="space-y-3">
+                        <div className="flex justify-between items-center"><h3 className="font-bold flex items-center gap-2"><Trophy size={18} className="text-amber-400" />ランキング</h3></div>
+                        <Card className="p-0 overflow-hidden divide-y">
+                            {ranking.slice(0, 5).map((r, i) => (
+                                <div key={r.id} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-white' : i === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-400'}`}>{i + 1}</span>
+                                        <span className="font-bold text-sm">{r.name}</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className={`text-sm font-black ${r.points >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{r.points > 0 ? `+${r.points.toFixed(1)}` : r.points.toFixed(1)}</div>
+                                        <div className="text-[8px] text-gray-400 font-bold">{r.count}戦</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </Card>
+                    </section>
+
+                    <section className="space-y-3">
+                        <div className="flex justify-between items-center"><h3 className="font-bold flex items-center gap-2"><History size={18} />直近の対局</h3><button onClick={() => navigate('history')} className="text-[10px] text-emerald-500 font-bold">すべて見る</button></div>
+                        <div className="grid gap-3">
+                            {matches.slice(0, 3).map(m => (
+                                <Card key={m.id} className="p-3 border-l-4 border-emerald-500 flex flex-col gap-2">
+                                    <div className="text-[9px] text-gray-400 font-bold">{new Date(m.timestamp).toLocaleString()}</div>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {m.points.map((pt, i) => (
+                                            <div key={i} className="text-center">
+                                                <div className="text-[8px] text-gray-500 truncate font-bold">{allPlayers[m.players[i]]?.name || '---'}</div>
+                                                <div className={`text-xs font-black ${pt >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{pt > 0 ? `+${pt}` : pt}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            );
+        };
+
+        const NewMatchView = () => {
+            const { currentGroupId, groups, getGroupPlayers, addMatch, addPlayer, navigate, viewParams, editMatch } = useStore();
+            const group = groups[currentGroupId];
+            const players = getGroupPlayers(currentGroupId);
+            const num = group.rules.gameType === '4ma' ? 4 : 3;
+            const targetScore = num === 4 ? (group.rules.initialPoints * 4 + group.rules.oka) : (group.rules.initialPoints * 3 + group.rules.oka);
+
+            const editingMatch = viewParams.editId ? groups[currentGroupId].matches[viewParams.editId] : null;
+
+            const [selected, setSelected] = useState(editingMatch?.players || new Array(num).fill(''));
+            const [scores, setScores] = useState(editingMatch?.scores || new Array(num).fill(0));
+            const [date, setDate] = useState(new Date(editingMatch?.timestamp || Date.now()).toISOString().slice(0, 10));
+            const [startTime, setStartTime] = useState(editingMatch?.startTime || '12:00');
+            const [endTime, setEndTime] = useState(editingMatch?.endTime || '13:00');
+            const [memo, setMemo] = useState(editingMatch?.memo || '');
+            const [hands, setHands] = useState(editingMatch?.hands || []);
+            const [isPreview, setIsPreview] = useState(false);
+            const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+            const [newName, setNewName] = useState('');
+
+            const result = useMemo(() => {
+                if (scores.some(s => isNaN(parseInt(s)))) return null;
+                return calculatePoints(scores.map(s => parseInt(s)), group.rules);
+            }, [scores, group]);
+
+            const sum = scores.reduce((a, b) => a + (parseInt(b) || 0), 0);
+            const isValid = sum === targetScore && selected.every(s => s !== '');
+
+            const addHand = () => setHands([...hands, {
+                yaku: [],
+                han: 0,
+                fu: 30,
+                points: 0,
+                winner: '',
+                loser: '',
+                type: 'ron',
+                isDealer: false,
+                isOpen: false,  // 食い下がり（鳴いているか）
+                ba: '東',       // 場
+                kyoku: 1,       // 局
+                honba: 0        // 本場
+            }]);
+            const updateHand = (idx, field, val) => {
+                const newHands = [...hands];
+                newHands[idx][field] = val;
+                setHands(newHands);
+            };
+
+            // 役データ（翻数付き）
+            const YAKU_DATA = {
+                // 1翻役
+                "立直": { han: 1, isMenzenOnly: true },
+                "一発": { han: 1, isMenzenOnly: true },
+                "断么九": { han: 1 },
+                "役牌(白)": { han: 1 },
+                "役牌(發)": { han: 1 },
+                "役牌(中)": { han: 1 },
+                "役牌(自風)": { han: 1 },
+                "役牌(場風)": { han: 1 },
+                "平和": { han: 1, isMenzenOnly: true },
+                "一盃口": { han: 1, isMenzenOnly: true },
+                "門前清自模和": { han: 1, isMenzenOnly: true },
+                "嶺上開花": { han: 1 },
+                "槍槓": { han: 1 },
+                "海底摸月": { han: 1 },
+                "河底撈魚": { han: 1 },
+                // 2翻役
+                "ダブル立直": { han: 2, isMenzenOnly: true },
+                "対々和": { han: 2 },
+                "三暗刻": { han: 2 },
+                "三色同刻": { han: 2 },
+                "三色同順": { han: 2, openHanReduction: 1 },
+                "一気通貫": { han: 2, openHanReduction: 1 },
+                "チャンタ": { han: 2, openHanReduction: 1 },
+                "混老頭": { han: 2 },
+                "七対子": { han: 2, isMenzenOnly: true },
+                "小三元": { han: 2 },
+                "三槓子": { han: 2 },
+                "混一色": { han: 3, openHanReduction: 1 },
+                // 3翻役
+                "純全帯么九": { han: 3, openHanReduction: 1 },
+                "二盃口": { han: 3, isMenzenOnly: true },
+                // 6翻役
+                "清一色": { han: 6, openHanReduction: 1 },
+                // 役満
+                "国士無双": { han: 13, isMenzenOnly: true, isYakuman: true },
+                "国士無双13面待ち": { han: 26, isMenzenOnly: true, isYakuman: true },
+                "四暗刻": { han: 13, isMenzenOnly: true, isYakuman: true },
+                "四暗刻単騎": { han: 26, isMenzenOnly: true, isYakuman: true },
+                "大三元": { han: 13, isYakuman: true },
+                "字一色": { han: 13, isYakuman: true },
+                "小四喜": { han: 13, isYakuman: true },
+                "大四喜": { han: 26, isYakuman: true },
+                "緑一色": { han: 13, isYakuman: true },
+                "清老頭": { han: 13, isYakuman: true },
+                "九蓮宝燈": { han: 13, isMenzenOnly: true, isYakuman: true },
+                "純正九蓮宝燈": { han: 26, isMenzenOnly: true, isYakuman: true },
+                "四槓子": { han: 13, isYakuman: true },
+                "天和": { han: 13, isMenzenOnly: true, isYakuman: true },
+                "地和": { han: 13, isMenzenOnly: true, isYakuman: true },
+                // ローカル役
+                "人和": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
+                "流し満貫": { han: 5, isLocal: true },
+                "三連刻": { han: 2, isLocal: true },
+                "一色三順": { han: 3, isLocal: true, openHanReduction: 1 },
+                "大車輪": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
+                "百万石": { han: 13, isLocal: true, isYakuman: true },
+                "紅孔雀": { han: 13, isLocal: true, isYakuman: true },
+                "オープンリーチ": { han: 2, isMenzenOnly: true, isLocal: true },
+                "十三不塔": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
+                "燕返し": { han: 1, isLocal: true },
+                "石の上にも三年": { han: 13, isLocal: true, isYakuman: true },
+            };
+            const YAKU_LIST = Object.keys(YAKU_DATA);
+
+            // 点数計算関数（翻数・符から点数を算出）
+            const calculateHandPoints = (han, fu, isDealer, isTsumo) => {
+                if (han < 1) return 0;
+
+                // 役満以上
+                if (han >= 13) {
+                    const yakumanCount = Math.floor(han / 13);
+                    const basePoints = 32000 * yakumanCount;
+                    return isDealer ? Math.ceil(basePoints * 1.5) : basePoints;
+                }
+
+                // 満貫以上の固定点数
+                let basePoints = 0;
+                if (han >= 11) basePoints = 24000; // 三倍満
+                else if (han >= 8) basePoints = 16000; // 倍満
+                else if (han >= 6) basePoints = 12000; // 跳満
+                else if (han >= 5) basePoints = 8000; // 満貫
+                else if (han >= 4 && fu >= 40) basePoints = 8000; // 満貫
+                else if (han >= 3 && fu >= 70) basePoints = 8000; // 満貫
+                else {
+                    // 通常計算
+                    const basicPoints = fu * Math.pow(2, han + 2);
+                    basePoints = Math.min(basicPoints * 4, 8000);
+                }
+
+                if (isDealer) {
+                    return isTsumo
+                        ? Math.ceil((basePoints * 1.5) / 100) * 100
+                        : Math.ceil((basePoints * 1.5) / 100) * 100;
+                } else {
+                    return Math.ceil(basePoints / 100) * 100;
+                }
+            };
+
+            if (isPreview) {
+                return (
+                    <div className="p-4 space-y-6 max-w-xl mx-auto">
+                        <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => setIsPreview(false)}><PlusCircle className="rotate-45" size={18} /> 戻る</Button><h2 className="text-xl font-bold">保存前プレビュー</h2></div>
+                        <Card className="space-y-4">
+                            <div className="text-sm text-gray-500 font-bold border-b pb-2">ポイント計算結果</div>
+                            <div className="space-y-3">
+                                {selected.map((pid, i) => (
+                                    <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                                        <div>
+                                            <div className="text-xs font-bold text-gray-400">{players.find(p => p.id === pid)?.name}</div>
+                                            <div className="text-lg font-black">{parseInt(scores[i]).toLocaleString()}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className={`text-xl font-black ${result.points[i] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{result.points[i] > 0 ? `+${result.points[i]}` : result.points[i]}</div>
+                                            <Badge>{result.ranks[i]}位</Badge>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                        <Button className="w-full h-14 text-lg" onClick={() => {
+                            const ts = new Date(`${date}T${startTime}`).getTime();
+                            const matchData = { groupId: currentGroupId, players: selected, scores: scores.map(s => parseInt(s)), points: result.points, ranks: result.ranks, timestamp: ts, startTime, endTime, memo, hands };
+                            if (viewParams.editId) editMatch(viewParams.editId, matchData);
+                            else addMatch(matchData);
+                            navigate('dashboard');
+                        }}>確定して保存する</Button>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="p-4 space-y-4 max-w-xl mx-auto pb-32">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-black">{viewParams.editId ? '対局編集' : '対局記録'}</h2>
+                        <div className="flex flex-col items-end">
+                            <Badge variant={sum === targetScore ? "success" : "warning"}>{sum.toLocaleString()} / {targetScore.toLocaleString()}</Badge>
+                            {sum !== targetScore && <span className="text-[10px] text-red-500 mt-1 font-bold">点数が矛盾しています ({sum - targetScore > 0 ? `+${sum - targetScore}` : sum - targetScore})</span>}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-2">
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-gray-400">対局日</span>
+                                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-gray-400">開始時刻</span>
+                                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                            </div>
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-gray-400">終了時刻</span>
+                                <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-bold text-gray-400">メモ</span>
+                            <Input value={memo} onChange={e => setMemo(e.target.value)} placeholder="メモを入力..." />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 pt-2">
+                        {selected.map((s, i) => (
+                            <Card key={i} className="relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-1"><Badge>{i + 1}</Badge></div>
+                                <div className="space-y-3">
+                                    <div className="flex gap-2">
+                                        <select className="flex-1 h-10 px-3 border rounded-lg text-sm bg-white" value={s} onChange={e => { const n = [...selected]; n[i] = e.target.value; setSelected(n); }}>
+                                            <option value="">プレイヤーを選択</option>
+                                            {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                        </select>
+                                        <Button variant="outline" size="sm" onClick={() => setIsAddingPlayer(true)}><UserPlus size={16} /></Button>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-1">
+                                            <span className="text-[10px] font-bold text-gray-400 ml-1">最終素点</span>
+                                            <Input type="number" className="font-black text-xl h-12" value={scores[i]} onChange={e => { const n = [...scores]; n[i] = e.target.value; setScores(n); }} />
+                                        </div>
+                                        {result && (
+                                            <div className="text-right min-w-[70px] pt-4">
+                                                <div className={`text-lg font-black ${result.points[i] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{result.points[i] > 0 ? `+${result.points[i]}` : result.points[i]}</div>
+                                                <div className="text-[10px] text-gray-400 font-bold">{result.ranks[i]}位</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+
+                    <section className="space-y-3 pt-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-sm flex items-center gap-2"><Trophy size={16} />和了記録 (任意)</h3>
+                            <Button variant="outline" size="sm" className="text-[10px] h-7" onClick={addHand}><Plus size={14} className="mr-1" />和了を追加</Button>
+                        </div>
+                        {hands.length === 0 && <div className="text-center py-8 border-2 border-dashed rounded-xl text-gray-300 text-xs font-bold">和了の記録がありません</div>}
+                        <div className="space-y-3">
+                            {hands.map((h, i) => {
+                                // 選択された役から翻数を自動計算（食い下がり考慮）
+                                const autoHan = h.yaku.reduce((sum, yakuName) => {
+                                    const yakuInfo = YAKU_DATA[yakuName];
+                                    if (!yakuInfo) return sum;
+                                    // 門前限定役で鳴いている場合は0
+                                    if (yakuInfo.isMenzenOnly && h.isOpen) return sum;
+                                    // 食い下がり適用
+                                    const reduction = (h.isOpen && yakuInfo.openHanReduction) ? yakuInfo.openHanReduction : 0;
+                                    return sum + Math.max(yakuInfo.han - reduction, 0);
+                                }, 0);
+                                // 点数自動計算
+                                const calculatedPoints = calculateHandPoints(
+                                    parseInt(h.han) || autoHan,
+                                    parseInt(h.fu) || 30,
+                                    h.isDealer || false,
+                                    h.type === 'tsumo'
+                                );
+
+                                return (
+                                    <Card key={i} className="p-3 bg-gray-50/50 border-emerald-100">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-[10px] font-bold text-emerald-600">記録 #{i + 1}</span>
+                                            <button className="text-red-400 text-[10px]" onClick={() => setHands(hands.filter((_, idx) => idx !== i))}>削除</button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                            <select className="h-8 text-xs border rounded px-2" value={h.winner} onChange={e => updateHand(i, 'winner', e.target.value)}>
+                                                <option value="">和了者を選択</option>
+                                                {selected.filter(id => !!id).map(id => <option key={id} value={id}>{players.find(p => p.id === id)?.name}</option>)}
+                                            </select>
+                                            <select className="h-8 text-xs border rounded px-2" value={h.type} onChange={e => updateHand(i, 'type', e.target.value)}>
+                                                <option value="ron">ロン和了</option>
+                                                <option value="tsumo">ツモ和了</option>
+                                            </select>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 mb-2">
+                                            {h.type === 'ron' && (
+                                                <select className="h-8 text-xs border rounded px-2" value={h.loser} onChange={e => updateHand(i, 'loser', e.target.value)}>
+                                                    <option value="">放銃者を選択</option>
+                                                    {selected.filter(id => !!id && id !== h.winner).map(id => <option key={id} value={id}>{players.find(p => p.id === id)?.name}</option>)}
+                                                </select>
+                                            )}
+                                            <div className="flex items-center gap-3">
+                                                <label className="flex items-center gap-1 text-[10px]">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={h.isDealer || false}
+                                                        onChange={e => updateHand(i, 'isDealer', e.target.checked)}
+                                                        className="w-3 h-3"
+                                                    />
+                                                    <span className="font-bold text-amber-600">親</span>
+                                                </label>
+                                                <label className="flex items-center gap-1 text-[10px]">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={h.isOpen || false}
+                                                        onChange={e => updateHand(i, 'isOpen', e.target.checked)}
+                                                        className="w-3 h-3"
+                                                    />
+                                                    <span className="font-bold text-orange-500">副露(鳴)</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        {/* 場・局・本場 */}
+                                        <div className="grid grid-cols-3 gap-2 mb-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-slate-500 block">場</label>
+                                                <select
+                                                    className="w-full h-7 text-xs border rounded px-1"
+                                                    value={h.ba || '東'}
+                                                    onChange={e => updateHand(i, 'ba', e.target.value)}
+                                                >
+                                                    <option value="東">東場</option>
+                                                    <option value="南">南場</option>
+                                                    <option value="西">西場</option>
+                                                    <option value="北">北場</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-slate-500 block">局</label>
+                                                <select
+                                                    className="w-full h-7 text-xs border rounded px-1"
+                                                    value={h.kyoku || 1}
+                                                    onChange={e => updateHand(i, 'kyoku', parseInt(e.target.value))}
+                                                >
+                                                    {[1, 2, 3, 4].map(k => (
+                                                        <option key={k} value={k}>{k}局</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-slate-500 block">本場</label>
+                                                <Input
+                                                    type="number"
+                                                    className="h-7 text-xs text-center"
+                                                    value={h.honba || 0}
+                                                    min={0}
+                                                    onChange={e => updateHand(i, 'honba', parseInt(e.target.value) || 0)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* 翻数・符数・点数入力（ラベル明確化） */}
+                                        <div className="grid grid-cols-3 gap-2 mb-3 bg-white p-2 rounded-lg border">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-blue-600 block">翻数 (飜)</label>
+                                                <Input
+                                                    type="number"
+                                                    className="h-8 text-xs text-center font-bold"
+                                                    value={h.han || autoHan}
+                                                    onChange={e => updateHand(i, 'han', e.target.value)}
+                                                    placeholder={String(autoHan)}
+                                                />
+                                                {autoHan > 0 && <div className="text-[8px] text-blue-400">自動計算: {autoHan}翻</div>}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-purple-600 block">符数 (符)</label>
+                                                <select
+                                                    className="w-full h-8 text-xs border rounded px-1 font-bold text-center"
+                                                    value={h.fu || 30}
+                                                    onChange={e => updateHand(i, 'fu', e.target.value)}
+                                                >
+                                                    {[20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110].map(f => (
+                                                        <option key={f} value={f}>{f}符</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] font-bold text-emerald-600 block">点数 (点)</label>
+                                                <Input
+                                                    type="number"
+                                                    className="h-8 text-xs text-center font-bold"
+                                                    value={h.points || calculatedPoints}
+                                                    onChange={e => updateHand(i, 'points', e.target.value)}
+                                                    placeholder={String(calculatedPoints)}
+                                                />
+                                                {calculatedPoints > 0 && <div className="text-[8px] text-emerald-400">計算値: {calculatedPoints.toLocaleString()}</div>}
+                                            </div>
+                                        </div>
+
+                                        {/* 役選択（ローカル役とその他を分類） */}
+                                        <div className="space-y-2">
+                                            <div className="text-[9px] font-bold text-gray-500 border-b pb-1">通常役（選択すると翻数が自動計算されます）</div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {YAKU_LIST.filter(y => !YAKU_DATA[y]?.isLocal).map(y => (
+                                                    <button
+                                                        key={y}
+                                                        className={`px-1.5 py-0.5 rounded-[4px] text-[7px] font-bold border transition-colors ${h.yaku.includes(y) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-400 border-gray-200 hover:border-emerald-300'}`}
+                                                        onClick={() => {
+                                                            const newYaku = h.yaku.includes(y) ? h.yaku.filter(v => v !== y) : [...h.yaku, y];
+                                                            updateHand(i, 'yaku', newYaku);
+                                                            // 翻数を自動更新
+                                                            const newAutoHan = newYaku.reduce((sum, yakuName) => {
+                                                                const yakuInfo = YAKU_DATA[yakuName];
+                                                                return sum + (yakuInfo ? yakuInfo.han : 0);
+                                                            }, 0);
+                                                            if (newAutoHan > 0) {
+                                                                updateHand(i, 'han', newAutoHan);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {y}
+                                                        <span className="ml-0.5 opacity-60">({YAKU_DATA[y]?.han || '?'}翻)</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="text-[9px] font-bold text-orange-500 border-b pb-1 mt-2">ローカル役</div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {YAKU_LIST.filter(y => YAKU_DATA[y]?.isLocal).map(y => (
+                                                    <button
+                                                        key={y}
+                                                        className={`px-1.5 py-0.5 rounded-[4px] text-[7px] font-bold border transition-colors ${h.yaku.includes(y) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-400 border-orange-200 hover:border-orange-300'}`}
+                                                        onClick={() => {
+                                                            const newYaku = h.yaku.includes(y) ? h.yaku.filter(v => v !== y) : [...h.yaku, y];
+                                                            updateHand(i, 'yaku', newYaku);
+                                                            const newAutoHan = newYaku.reduce((sum, yakuName) => {
+                                                                const yakuInfo = YAKU_DATA[yakuName];
+                                                                return sum + (yakuInfo ? yakuInfo.han : 0);
+                                                            }, 0);
+                                                            if (newAutoHan > 0) {
+                                                                updateHand(i, 'han', newAutoHan);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {y}
+                                                        <span className="ml-0.5 opacity-60">({YAKU_DATA[y]?.han || '?'}翻)</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    </section>
+
+                    {isAddingPlayer && (
+                        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-[100] backdrop-blur-sm">
+                            <Card className="w-full max-w-sm space-y-4 bg-white shadow-2xl p-6">
+                                <h3 className="font-bold">プレイヤー追加</h3>
+                                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前を入力..." autoFocus />
+                                <div className="flex gap-2">
+                                    <Button variant="secondary" className="flex-1" onClick={() => setIsAddingPlayer(false)}>戻る</Button>
+                                    <Button className="flex-1" onClick={() => { if (newName) addPlayer(newName); setNewName(''); setIsAddingPlayer(false); }}>追加</Button>
+                                </div>
+                            </Card>
+                        </div>
+                    )}
+
+                    <div className="fixed bottom-20 left-4 right-4 max-w-xl mx-auto flex gap-2">
+                        <Button variant="secondary" className="flex-1 h-14" onClick={() => navigate('dashboard')}>戻る</Button>
+                        <Button className="flex-[2] h-14" disabled={!isValid} onClick={() => setIsPreview(true)} size="lg">内容を確認する</Button>
+                    </div>
+                </div>
+            );
+        };
+
+        const HistoryView = () => {
+            const { currentGroupId, getGroupMatches, players: allPlayers, deleteMatch, navigate } = useStore();
+            const matches = getGroupMatches(currentGroupId).sort((a, b) => b.timestamp - a.timestamp);
+            const [filterPlayer, setFilterPlayer] = useState('');
+            const [sortOrder, setSortOrder] = useState('desc');
+
+            const filteredMatches = useMemo(() => {
+                let m = matches;
+                if (filterPlayer) m = m.filter(match => match.players.includes(filterPlayer));
+                return sortOrder === 'asc' ? [...m].reverse() : m;
+            }, [matches, filterPlayer, sortOrder]);
+
+            return (
+                <div className="p-4 space-y-4 max-w-2xl mx-auto pb-32">
+                    <div className="flex justify-between items-center">
+                        <h2 className="text-xl font-black">対局履歴</h2>
+                        <span className="text-xs font-bold text-gray-400">{filteredMatches.length} 件</span>
+                    </div>
+
+                    <Card className="p-2 flex gap-2 overflow-x-auto no-scrollbar">
+                        <select className="text-xs border rounded p-1" value={filterPlayer} onChange={e => setFilterPlayer(e.target.value)}>
+                            <option value="">全プレイヤー</option>
+                            {Object.values(allPlayers).filter(p => p.groupId === currentGroupId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <select className="text-xs border rounded p-1" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+                            <option value="desc">新しい順</option>
+                            <option value="asc">古い順</option>
+                        </select>
+                    </Card>
+
+                    <div className="space-y-3">
+                        {filteredMatches.map(m => (
+                            <Card key={m.id} className="p-3 border-l-4 border-emerald-500 relative group text-xs">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="text-[10px] text-gray-400 font-bold">{new Date(m.timestamp).toLocaleString()}</div>
+                                    <div className="flex gap-2">
+                                        <button className="text-[10px] text-emerald-500 underline" onClick={() => navigate('newMatch', { editId: m.id })}>編集</button>
+                                        <button className="text-[10px] text-red-500 underline" onClick={() => { if (confirm("削除しますか？")) deleteMatch(m.id); }}>削除</button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {m.points.map((pt, i) => (
+                                        <div key={i} className="text-center">
+                                            <div className="text-[9px] text-gray-500 truncate font-bold">{allPlayers[m.players[i]]?.name || '---'}</div>
+                                            <div className={`text-sm font-black ${pt >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{pt > 0 ? `+${pt}` : pt}</div>
+                                            <div className="text-[8px] text-gray-300">{parseInt(m.scores[i]).toLocaleString()}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                {m.hands && m.hands.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t flex flex-wrap gap-1">
+                                        {m.hands.map((h, hi) => (
+                                            <Badge key={hi} variant="secondary" className="text-[7px] py-0 px-1">{allPlayers[h.winner]?.name.slice(0, 2)}: {h.yaku?.[0] || '和了'}</Badge>
+                                        ))}
+                                    </div>
+                                )}
+                                {m.memo && <div className="mt-1 text-[8px] text-gray-400 bg-gray-50 p-1 rounded italic flex items-center gap-1"><Icons.FileText size={10} /> "{m.memo}"</div>}
+                            </Card>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip: ChartTooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } = Recharts || {};
+        const AnalyticsView = () => {
+            const { currentGroupId, getGroupPlayers, getGroupMatches, players: allPlayers, groups } = useStore();
+            const group = groups[currentGroupId];
+            const players = getGroupPlayers(currentGroupId);
+            const chronMatches = getGroupMatches(currentGroupId).sort((a, b) => a.timestamp - b.timestamp);
+
+            const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+            const [range, setRange] = useState('all');
+            const [metric, setMetric] = useState('points');
+            const [period, setPeriod] = useState('all');
+
+            // グループがない場合のガード
+            if (!group) return (
+                <div className="p-4 text-center">
+                    <p className="text-gray-500">グループが見つかりません</p>
+                </div>
+            );
+
+            const filteredChronMatches = useMemo(() => {
+                const now = new Date();
+                return chronMatches.filter(m => {
+                    const d = new Date(m.timestamp);
+                    if (period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                    if (period === 'year') return d.getFullYear() === now.getFullYear();
+                    return true;
+                });
+            }, [chronMatches, period]);
+
+            const stats = useMemo(() => {
+                const s = {};
+                players.forEach(p => s[p.id] = {
+                    id: p.id, name: p.name,
+                    totalPoints: 0, totalScore: 0,
+                    ranks: [], history: [{ m: 0, val: 0 }],
+                    hands: 0, highestPoints: 0, highestHand: null,
+                    count: 0, yaku: {}, rankDist: { 1: 0, 2: 0, 3: 0, 4: 0 }
+                });
+
+                filteredChronMatches.forEach((m, i) => {
+                    m.players.forEach((pid, pidx) => {
+                        if (s[pid]) {
+                            const point = m.points?.[pidx] ?? 0;
+                            const score = m.scores?.[pidx] ?? 0;
+                            const rank = m.ranks?.[pidx];
+
+                            s[pid].totalPoints += point;
+                            s[pid].totalScore += score;
+                            if (rank) {
+                                s[pid].ranks.push(rank);
+                                s[pid].rankDist[rank] = (s[pid].rankDist[rank] || 0) + 1;
+                            }
+                            s[pid].count++;
+
+                            let val = 0;
+                            if (metric === 'points') val = parseFloat(s[pid].totalPoints.toFixed(1));
+                            else if (metric === 'rank') val = parseFloat((s[pid].ranks.reduce((a, b) => a + b, 0) / s[pid].ranks.length).toFixed(2));
+                            else val = s[pid].totalScore;
+
+                            s[pid].history.push({ m: i + 1, val });
+                        }
+                    });
+                    if (m.hands) {
+                        m.hands.forEach(h => {
+                            if (s[h.winner]) {
+                                s[h.winner].hands++;
+                                if (parseInt(h.points) > s[h.winner].highestPoints) {
+                                    s[h.winner].highestPoints = parseInt(h.points);
+                                    s[h.winner].highestHand = { yaku: h.yaku, points: h.points, date: m.timestamp };
+                                }
+                                if (h.yaku) h.yaku.forEach(y => { s[h.winner].yaku[y] = (s[h.winner].yaku[y] || 0) + 1; });
+                            }
+                        });
+                    }
+                });
+
+                return Object.values(s).sort((a, b) => b.totalPoints - a.totalPoints);
+            }, [players, filteredChronMatches, metric]);
+
+            const chartData = useMemo(() => {
+                let targetMatches = filteredChronMatches;
+                if (range !== 'all') targetMatches = filteredChronMatches.slice(-parseInt(range));
+
+                return Array.from({ length: targetMatches.length + 1 }, (_, i) => {
+                    const row = { name: `${i}戦` };
+                    stats.forEach(p => {
+                        const matchIdxInFiltered = filteredChronMatches.length - targetMatches.length + i;
+                        const entry = p.history[matchIdxInFiltered] || { val: 0 };
+                        row[p.name] = entry.val;
+                    });
+                    return row;
+                });
+            }, [stats, filteredChronMatches, range]);
+
+            // プレイヤー選択画面
+            if (!selectedPlayerId) {
+                return (
+                    <div className="p-6 max-w-md mx-auto space-y-6 pb-24">
+                        <h2 className="text-2xl font-black">分析</h2>
+                        <Card className="p-4 bg-emerald-50 border-emerald-100">
+                            <div className="flex gap-2">
+                                <Icons.Info size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                                <p className="text-xs text-emerald-800 font-bold">詳細はプレイヤーを選択してください</p>
+                            </div>
+                        </Card>
+                        <div className="grid gap-3">
+                            {players.map(p => (
+                                <Card key={p.id} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 active:scale-95 transition-all" onClick={() => setSelectedPlayerId(p.id)}>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-black">
+                                            {p.name.slice(0, 2)}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-lg">{p.name}</div>
+                                            <div className="text-[10px] text-gray-400 font-bold">通算 {stats.find(s => s.id === p.id)?.count || 0} 戦</div>
+                                        </div>
+                                    </div>
+                                    <Icons.ChevronRight size={20} className="text-gray-300" />
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            // 個別詳細画面
+            const targetStat = stats.find(s => s.id === selectedPlayerId);
+            if (!targetStat) return <div className="p-4">プレイヤーデータが見つかりません <Button onClick={() => setSelectedPlayerId(null)}>戻る</Button></div>;
+
+            const yakuRanking = Object.entries(targetStat.yaku).sort((a, b) => b[1] - a[1]).slice(0, 10);
+            const yakuPieData = yakuRanking.map(([name, count], i) => ({
+                name,
+                value: count,
+                color: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'][i % 10]
+            }));
+
+            return (
+                <div className="p-4 space-y-6 max-w-4xl mx-auto pb-32">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedPlayerId(null)}>
+                            <Icons.ChevronLeft size={16} /> 一覧へ
+                        </Button>
+                        <h2 className="text-xl font-black">{targetStat.name}の分析</h2>
+                    </div>
+
+                    <div className="flex justify-end gap-2 mb-2">
+                        <select className="text-[10px] border rounded font-bold px-1" value={period} onChange={e => setPeriod(e.target.value)}>
+                            <option value="all">全期間</option>
+                            <option value="month">今月</option>
+                            <option value="year">今年</option>
+                        </select>
+                        <select className="text-[10px] border rounded font-bold px-1" value={metric} onChange={e => setMetric(e.target.value)}>
+                            <option value="points">収支</option>
+                            <option value="rank">平均順位</option>
+                        </select>
+                        <select className="text-[10px] border rounded font-bold px-1" value={range} onChange={e => setRange(e.target.value)}>
+                            <option value="all">全表示</option>
+                            <option value="10">直近10戦</option>
+                            <option value="5">直近5戦</option>
+                        </select>
+                    </div>
+
+                    <Card className="h-64 p-2 bg-white flex flex-col shadow-sm">
+                        <div className="flex justify-between items-center mb-2 px-1">
+                            <span className="text-[10px] font-bold text-gray-400">{metric === 'points' ? '累積収支推移' : '平均順位推移'}</span>
+                            <div className="flex gap-2 items-center text-[8px] text-gray-400 font-bold">
+                                <Icons.TrendingUp size={10} /> Trend
+                            </div>
+                        </div>
+                        {chartData.length > 1 && stats.length > 0 && ResponsiveContainer && LineChart ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={chartData}>
+                                    <CartesianGrid strokeOpacity={0.05} vertical={false} />
+                                    <XAxis hide dataKey="name" />
+                                    <YAxis fontSize={8} reversed={metric === 'rank'} tickFormatter={v => metric === 'points' && v > 0 ? `+${v}` : v} />
+                                    <ChartTooltip contentStyle={{ fontSize: '10px', borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} />
+                                    <Legend iconType="circle" wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} />
+                                    {/* 選択されたプレイヤーのみ太く表示、他は薄く表示 */}
+                                    {stats.map((p, i) => (
+                                        <Line
+                                            key={p.id}
+                                            type="monotone"
+                                            dataKey={p.name}
+                                            stroke={p.id === selectedPlayerId ? '#10b981' : '#e5e7eb'}
+                                            strokeWidth={p.id === selectedPlayerId ? 3 : 1}
+                                            dot={p.id === selectedPlayerId ? { r: 3 } : false}
+                                            activeDot={{ r: 5 }}
+                                            animationDuration={1000}
+                                            // 他プレイヤーのラインは目立たなくする
+                                            strokeOpacity={p.id === selectedPlayerId ? 1 : 0.3}
+                                            zIndex={p.id === selectedPlayerId ? 10 : 0}
+                                        />
+                                    ))}
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center text-gray-300 text-sm font-bold">
+                                対局データがありません
+                            </div>
+                        )}
+                    </Card>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {/* 基本スタッツ */}
+                        <Card className="space-y-4 p-4">
+                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.Activity size={16} /> スタッツ</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="text-center p-2 bg-gray-50 rounded">
+                                    <div className="text-xs text-gray-500 mb-1">平均順位</div>
+                                    <div className="text-xl font-black text-emerald-600">{(targetStat.ranks.length ? targetStat.ranks.reduce((a, b) => a + b, 0) / targetStat.ranks.length : 0).toFixed(2)}</div>
+                                </div>
+                                <div className="text-center p-2 bg-gray-50 rounded">
+                                    <div className="text-xs text-gray-500 mb-1">トップ率</div>
+                                    <div className="text-xl font-black text-blue-600">{(targetStat.ranks.filter(r => r === 1).length / (targetStat.count || 1) * 100).toFixed(1)}%</div>
+                                </div>
+                                <div className="text-center p-2 bg-gray-50 rounded">
+                                    <div className="text-xs text-gray-500 mb-1">平均素点</div>
+                                    <div className="text-xl font-black">{Math.round(targetStat.totalScore / (targetStat.count || 1)).toLocaleString()}</div>
+                                </div>
+                                <div className="text-center p-2 bg-gray-50 rounded">
+                                    <div className="text-xs text-gray-500 mb-1">平均収支</div>
+                                    <div className="text-xl font-black">{(targetStat.totalPoints / (targetStat.count || 1)).toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* 最高打点 */}
+                        <Card className="p-4 bg-gradient-to-br from-amber-50 to-amber-100">
+                            <div className="text-[10px] font-bold text-amber-500 mb-2 flex items-center gap-1">
+                                <Icons.Trophy size={12} />最高打点の手
+                            </div>
+                            {targetStat.highestHand ? (
+                                <div className="space-y-1">
+                                    <div className="text-lg font-black text-amber-700">
+                                        {parseInt(targetStat.highestHand.points).toLocaleString()}点
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {(targetStat.highestHand.yaku || []).slice(0, 3).map(y => (
+                                            <span key={y} className="bg-white px-1.5 py-0.5 rounded text-[7px] font-bold text-amber-600 border border-amber-200">{y}</span>
+                                        ))}
+                                        {(targetStat.highestHand.yaku || []).length > 3 && (
+                                            <span className="text-[8px] text-amber-400">+{targetStat.highestHand.yaku.length - 3}</span>
+                                        )}
+                                    </div>
+                                    <div className="text-[8px] text-amber-400">{new Date(targetStat.highestHand.date).toLocaleDateString()}</div>
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-amber-400">データなし</div>
+                            )}
+                        </Card>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {/* 順位分布 */}
+                        <Card className="p-4 space-y-4">
+                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.BarChart3 size={16} /> 順位分布</h3>
+                            <div className="h-48">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={[{ name: targetStat.name, range1: targetStat.rankDist[1], range2: targetStat.rankDist[2], range3: targetStat.rankDist[3], range4: targetStat.rankDist[4] }]}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="name" fontSize={8} />
+                                        <YAxis fontSize={8} />
+                                        <ChartTooltip />
+                                        <Bar dataKey="range1" name="1位" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="range2" name="2位" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="range3" name="3位" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="range4" name="4位" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </Card>
+
+                        {/* 役頻度 */}
+                        <Card className="p-4 space-y-4">
+                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.PieChart size={16} /> 役傾向</h3>
+                            {yakuPieData.length > 0 ? (
+                                <div className="flex items-center">
+                                    <div className="h-32 w-32 shrink-0">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={yakuPieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} paddingAngle={2} dataKey="value">
+                                                    {yakuPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                                                </Pie>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="flex-1 pl-4 h-32 overflow-y-auto custom-scrollbar">
+                                        {yakuRanking.map(([name, count], i) => (
+                                            <div key={name} className="flex justify-between items-center text-[10px] mb-1">
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: yakuPieData[i].color }}></div>
+                                                    <span>{name}</span>
+                                                </div>
+                                                <span className="font-bold">{count}回</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center text-gray-400 text-xs py-8">データなし</div>
+                            )}
+                        </Card>
+                    </div>
+                </div>
+            );
+        };
+
+        const SettingsView = () => {
+            const { currentGroupId, groups, updateGroupRules, navigate, leaveGroup } = useStore();
+            const group = groups[currentGroupId];
+
+            if (!group) return null;
+
+            return (
+                <div className="p-4 space-y-6 max-w-2xl mx-auto pb-32">
+                    <h2 className="text-xl font-black">グループ設定</h2>
+
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Settings size={18} className="text-gray-400" />
+                            <h3 className="font-bold text-sm">基本ルール設定</h3>
+                        </div>
+                        <Card className="p-4">
+                            <RuleForm
+                                initialRules={group.rules}
+                                onSubmit={(newRules) => {
+                                    updateGroupRules(currentGroupId, newRules);
+                                    alert("ルールを更新しました");
+                                }}
+                                submitLabel="ルールを保存"
+                            />
+                        </Card>
+                    </section>
+
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                            <LogIn size={18} className="text-blue-400 rotate-180" />
+                            <h3 className="font-bold text-sm">グループ管理</h3>
+                        </div>
+                        <Card className="p-4 border-blue-100 bg-blue-50/30">
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
+                                    現在のグループから一時的に抜けます。データは保持され、再度参加できます。
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
+                                    onClick={() => {
+                                        if (confirm("グループから抜けますか？")) {
+                                            leaveGroup();
+                                        }
+                                    }}
+                                >
+                                    グループから抜ける
+                                </Button>
+                            </div>
+                        </Card>
+                    </section>
+
+                    <section className="space-y-3">
+                        <div className="flex items-center gap-2 mb-2">
+                            <AlertCircle size={18} className="text-red-400" />
+                            <h3 className="font-bold text-sm text-red-500">デッド操作</h3>
+                        </div>
+                        <Card className="p-4 border-red-100 bg-red-50/30">
+                            <div className="space-y-4">
+                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">データを削除すると元に戻せません。このグループのすべての対局記録が消去されます。</p>
+                                <Button variant="outline" className="w-full text-red-500 border-red-200 hover:bg-red-50" onClick={() => {
+                                    if (confirm("全てのデータをリセットしますか？この操作は取り消せません。")) {
+                                        localStorage.removeItem('mahjong-tracker-storage');
+                                        window.location.reload();
+                                    }
+                                }}>全てのデータをリセット</Button>
+                            </div>
+                        </Card>
+                    </section>
+
+                    <Button variant="secondary" className="w-full h-12" onClick={() => navigate('dashboard')}>戻る</Button>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const { currentGroupId, currentView } = useStore();
+            const view = currentView || (currentGroupId ? 'dashboard' : 'onboarding');
+            return (
+                <Layout hideNav={view === 'onboarding'}>
+                    {view === 'onboarding' && <OnboardingView />}
+                    {view === 'dashboard' && <DashboardView />}
+                    {view === 'newMatch' && <NewMatchView />}
+                    {view === 'history' && <HistoryView />}
+                    {view === 'analytics' && <AnalyticsView />}
+                    {view === 'settings' && <SettingsView />}
+                </Layout>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<AppProvider><App /></AppProvider>);
+    </script>
+</body>
+
+</html>
