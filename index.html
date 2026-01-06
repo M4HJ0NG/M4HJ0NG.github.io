@@ -323,6 +323,50 @@
                 }
             }, [state.currentGroupId]);
 
+            const loadGroupData = async (groupId) => {
+                  setState(s => ({ ...s, isLoading: true }));
+
+                    try {
+                        await waitForAuth();
+
+                            const groupDoc = await db.collection('groups').doc(groupId).get();
+                                if (!groupDoc.exists) throw new Error("グループが存在しません");
+
+                                    const playersSnap = await db
+                                          .collection('groups').doc(groupId)
+                                                .collection('players').get();
+
+                                                    const matchesSnap = await db
+                                                          .collection('groups').doc(groupId)
+                                                                .collection('matches').get();
+
+                                                                    const players = {};
+                                                                        playersSnap.forEach(d => players[d.id] = d.data());
+
+                                                                            const matches = {};
+                                                                                matchesSnap.forEach(d => matches[d.id] = d.data());
+
+                                                                                    setState(s => ({
+                                                                                          ...s,
+                                                                                                groups: { [groupId]: groupDoc.data() },
+                                                                                                      players,
+                                                                                                            matches,
+                                                                                                                  currentView: 'dashboard',
+                                                                                                                        isLoading: false
+                                                                                                                            }));
+
+                                                                                                                              } catch (e) {
+                                                                                                                                  console.error(e);
+                                                                                                                                      setState(s => ({
+                                                                                                                                            ...s,
+                                                                                                                                                  error: e.message,
+                                                                                                                                                        isLoading: false
+                                                                                                                                                            }));
+                                                                                                                                                              }
+                                                                                                                                                              };
+
+            }
+
 
             const actions = {
                 createGroup: async (name, passkey, rules) => {
@@ -343,7 +387,7 @@
                     try {
                         await db.collection('groups').doc(id).set(newGroup);
                         // Let the listener handle the view switch
-                        setState(s => ({ ...s, currentGroupId: id, isLoading: true }));
+                        setState(s => ({ ...s, currentGroupId: id}));
                         return id;
                     } catch (e) {
                         alert("グループ作成失敗: " + e.message + "\n権限エラーの場合は、しばらく待ってから再試行してください。");
