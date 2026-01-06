@@ -107,18 +107,6 @@
     </script>
 
     <script type="text/babel">
-        const waitForAuth = () => {
-              return new Promise(resolve => {
-                  const unsub = auth.onAuthStateChanged(user => {
-                        if (user) {
-                                unsub();
-                                        resolve(user);
-                                              }
-                                                  });
-                                                    });
-                                                    };
-
-        
         const uuidv4 = () => {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -323,50 +311,70 @@
                 }
             }, [state.currentGroupId]);
 
-            const loadGroupData = async (groupId) => {
-                  setState(s => ({ ...s, isLoading: true }));
+            // Firestore Listeners - ONLY runs when authenticated and groupId exists
+            useEffect(() => {
+                if (!state.isAuthenticated || !state.currentGroupId) return;
 
-                    try {
-                        await waitForAuth();
+                const groupId = state.currentGroupId;
 
-                            const groupDoc = await db.collection('groups').doc(groupId).get();
-                                if (!groupDoc.exists) throw new Error("グループが存在しません");
+                // Track initialization of each listener
+                let loaded = { group: false, players: false, matches: false };
 
-                                    const playersSnap = await db
-                                          .collection('groups').doc(groupId)
-                                                .collection('players').get();
+                // Helper to update global loading state
+                const checkLoading = () => {
+                    if (loaded.group && loaded.players && loaded.matches) {
+                        setState(s => ({
+                            ...s,
+                            isLoading: false,
+                            // Only switch to dashboard if we are still onboarding
+                            currentView: s.currentView === 'onboarding' ? 'dashboard' : s.currentView
+                        }));
+                    }
+                };
 
-                                                    const matchesSnap = await db
-                                                          .collection('groups').doc(groupId)
-                                                                .collection('matches').get();
+                setState(s => ({ ...s, isLoading: true }));
 
-                                                                    const players = {};
-                                                                        playersSnap.forEach(d => players[d.id] = d.data());
+                // 1. Group Metadata Listener
+                const unsubscribeGroup = db.collection('groups').doc(groupId).onSnapshot(doc => {
+                    if (doc.exists) {
+                        setState(s => ({
+                            ...s,
+                            groups: { ...s.groups, [groupId]: doc.data() }
+                        }));
+                        loaded.group = true;
+                        checkLoading();
+                    } else {
+                        setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', error: 'Group not found', isLoading: false }));
+                    }
+                }, err => {
+                    console.error("Group Listener Error:", err);
+                    setState(s => ({ ...s, isLoading: false }));
+                });
 
-                                                                            const matches = {};
-                                                                                matchesSnap.forEach(d => matches[d.id] = d.data());
+                // 2. Players Listener
+                const unsubscribePlayers = db.collection('groups').doc(groupId).collection('players').onSnapshot(snapshot => {
+                    const players = {};
+                    snapshot.forEach(doc => players[doc.id] = doc.data());
+                    setState(s => ({ ...s, players }));
+                    loaded.players = true;
+                    checkLoading();
+                }, err => console.error("Players Listener Error:", err));
 
-                                                                                    setState(s => ({
-                                                                                          ...s,
-                                                                                                groups: { [groupId]: groupDoc.data() },
-                                                                                                      players,
-                                                                                                            matches,
-                                                                                                                  currentView: 'dashboard',
-                                                                                                                        isLoading: false
-                                                                                                                            }));
+                // 3. Matches Listener
+                const unsubscribeMatches = db.collection('groups').doc(groupId).collection('matches').onSnapshot(snapshot => {
+                    const matches = {};
+                    snapshot.forEach(doc => matches[doc.id] = doc.data());
+                    setState(s => ({ ...s, matches }));
+                    loaded.matches = true;
+                    checkLoading();
+                }, err => console.error("Matches Listener Error:", err));
 
-                                                                                                                              } catch (e) {
-                                                                                                                                  console.error(e);
-                                                                                                                                      setState(s => ({
-                                                                                                                                            ...s,
-                                                                                                                                                  error: e.message,
-                                                                                                                                                        isLoading: false
-                                                                                                                                                            }));
-                                                                                                                                                              }
-                                                                                                                                                              };
-
-            }
-
+                return () => {
+                    unsubscribeGroup();
+                    unsubscribePlayers();
+                    unsubscribeMatches();
+                };
+            }, [state.currentGroupId, state.isAuthenticated]);
 
             const actions = {
                 createGroup: async (name, passkey, rules) => {
@@ -387,7 +395,7 @@
                     try {
                         await db.collection('groups').doc(id).set(newGroup);
                         // Let the listener handle the view switch
-                        setState(s => ({ ...s, currentGroupId: id}));
+                        setState(s => ({ ...s, currentGroupId: id, isLoading: true }));
                         return id;
                     } catch (e) {
                         alert("グループ作成失敗: " + e.message + "\n権限エラーの場合は、しばらく待ってから再試行してください。");
@@ -488,6 +496,7 @@
             };
 
             return <AppContext.Provider value={{ ...state, ...actions }}>{children}</AppContext.Provider>;
+        };
 
         const useStore = () => useContext(AppContext);
 
