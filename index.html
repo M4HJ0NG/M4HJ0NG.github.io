@@ -107,6 +107,18 @@
     </script>
 
     <script type="text/babel">
+        const waitForAuth = () => {
+              return new Promise(resolve => {
+                  const unsub = auth.onAuthStateChanged(user => {
+                        if (user) {
+                                unsub();
+                                        resolve(user);
+                                              }
+                                                  });
+                                                    });
+                                                    };
+
+        
         const uuidv4 = () => {
             if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
