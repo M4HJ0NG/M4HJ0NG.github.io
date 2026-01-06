@@ -1,1737 +1,708 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Mahjong Tracker</title>
-    <!-- Tailwind Play CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            DEFAULT: '#10b981',
-                            foreground: '#ffffff',
-                        },
-                        secondary: {
-                            DEFAULT: '#f3f4f6',
-                            foreground: '#1f2937',
-                        },
-                        destructive: {
-                            DEFAULT: '#ef4444',
-                            foreground: '#ffffff',
-                        },
-                        muted: {
-                            DEFAULT: '#f3f4f6',
-                            foreground: '#6b7280',
-                        },
-                        accent: {
-                            DEFAULT: '#f3f4f6',
-                            foreground: '#1f2937',
-                        },
-                    },
-                    borderRadius: {
-                        'xl': '1rem',
-                        '2xl': '1.5rem',
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Google Fonts -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap"
-        rel="stylesheet">
-    <!-- Load Dependencies -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://unpkg.com/recharts@2.10.3/dist/Recharts.min.js"></script>
-    <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
-    <script src="https://unpkg.com/date-fns@3.3.1/cdn.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAHJONG TRACKER PRO V2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        body {
-            font-family: 'Inter', 'Noto Sans JP', sans-serif;
-            background-color: #f8fafc;
-        }
-
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            border-radius: 1rem;
-        }
-
-        .pb-safe {
-            padding-bottom: env(safe-area-inset-bottom);
-        }
+        :root { --main-green: #10b981; --bg-gray: #f4f7f6; --text-dark: #1e293b; }
+        body { background-color: var(--bg-gray); color: var(--text-dark); font-family: 'Inter', sans-serif; padding-bottom: 100px; }
+        .card { border-radius: 24px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1rem; overflow: hidden; background: white; }
+        .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #edf2f7; z-index: 1000; }
+        .nav-item { border: none; background: none; color: #94a3b8; font-size: 1.4rem; position: relative; transition: 0.3s; }
+        .nav-item.active { color: var(--main-green); transform: translateY(-2px); }
+        .btn-plus-fixed { background: var(--main-green); color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-top: -35px; border: 6px solid var(--bg-gray); box-shadow: 0 8px 20px rgba(16,185,129,0.4); }
+        .yaku-node { padding: 6px 4px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.75rem; text-align: center; background: white; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: 0.1s; user-select: none; }
+        .yaku-node.active { background: var(--main-green); color: white; border-color: var(--main-green); font-weight: bold; }
+        .yaku-node.disabled { opacity: 0.3; pointer-events: none; background: #f1f5f9; }
+        .summary-box { background: white; border-radius: 16px; padding: 12px; text-align: center; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .val-large { font-size: 1.1rem; font-weight: 800; color: var(--main-green); display: block; line-height: 1.2; }
+        .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .stat-item { background: #f8fafc; padding: 10px; border-radius: 12px; text-align: center; }
+        .form-select-sm, .form-control-sm { font-size: 0.85rem; }
+        [v-cloak] { display: none; }
     </style>
 </head>
-
 <body>
-    <div id="root">
-        <div class="flex items-center justify-center min-h-screen">
-            <div id="loading-spinner" class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-            <div id="error-display"
-                class="hidden p-4 bg-red-50 text-red-600 rounded-lg max-w-md text-sm border border-red-200"></div>
+
+<div id="app" v-cloak>
+    <div v-if="!currentRoomId" class="container d-flex justify-content-center align-items-center" style="min-height: 100vh;">
+        <div class="text-center w-100 px-4" style="max-width: 400px;">
+            <h1 class="fw-black mb-4 display-6">MAHJONG<br><span style="color:var(--main-green)">TRACKER</span></h1>
+            <div class="card p-4 shadow-lg">
+                <div class="btn-group w-100 mb-4 bg-light rounded-pill p-1">
+                    <button class="btn rounded-pill border-0" :class="authMode==='login'?'bg-white shadow-sm fw-bold':'text-muted'" @click="authMode='login'">入室</button>
+                    <button class="btn rounded-pill border-0" :class="authMode==='create'?'bg-white shadow-sm fw-bold':'text-muted'" @click="authMode='create'">新規作成</button>
+                </div>
+                <input type="text" v-model="loginForm.room" class="form-control mb-2 rounded-pill p-3 border-0 bg-light" placeholder="グループID (例: my-team)">
+                <input type="password" v-model="loginForm.pass" class="form-control mb-4 rounded-pill p-3 border-0 bg-light" placeholder="合言葉">
+                <button @click="joinRoom(authMode)" class="btn btn-success w-100 rounded-pill py-3 fw-bold">
+                    {{ authMode === 'login' ? 'ログイン' : 'グループ作成' }}
+                </button>
+            </div>
         </div>
     </div>
 
-    <script>
-        window.onerror = function (msg, url, line, col, error) {
-            const display = document.getElementById('error-display');
-            const spinner = document.getElementById('loading-spinner');
-            if (display) {
-                display.classList.remove('hidden');
-                display.innerText = "Error: " + msg + "\nLine: " + line;
-                if (spinner) spinner.classList.add('hidden');
-            }
-            return false;
-        };
-    </script>
+    <div v-else class="container pt-3">
+        <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+            <h4 class="fw-black m-0" @click="tab='dashboard'; selectedPlayer=null">RANKING</h4>
+            <div class="badge bg-white text-dark border rounded-pill px-3 py-2 small fw-bold shadow-sm">ID: {{ currentRoomId }}</div>
+        </div>
 
-    <script type="text/babel">
-        const uuidv4 = () => {
-            if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        };
-
-        const { useState, useEffect, useMemo, useCallback, createContext, useContext } = React;
-
-        // --- Lucide Icon Wrapper ---
-        // The UMD build of lucide returns raw data. We need to convert it to React elements.
-        const LucideIcon = ({ icon, size = 24, className = "", ...props }) => {
-            if (!icon || !Array.isArray(icon)) return null;
-
-            const renderElement = (el, key) => {
-                const [tag, attrs, children] = el;
-                return React.createElement(
-                    tag,
-                    { ...attrs, key },
-                    Array.isArray(children) ? children.map((child, i) => renderElement(child, i)) : null
-                );
-            };
-
-            return (
-                <svg
-                    width={size}
-                    height={size}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={className}
-                    {...props}
-                >
-                    {icon.map((child, i) => renderElement(child, i))}
-                </svg>
-            );
-        };
-
-        const Icons = {};
-        if (typeof lucide !== 'undefined') {
-            Object.keys(lucide).forEach(key => {
-                if (Array.isArray(lucide[key])) {
-                    Icons[key] = (props) => <LucideIcon icon={lucide[key]} {...props} />;
-                }
-            });
-        }
-
-        const {
-            LayoutDashboard, History, BarChart2, Settings, PlusCircle,
-            TrendingUp, BarChart3, Download, Save, UserPlus, AlertCircle,
-            Calendar, Trophy, Plus, LogIn, FileText
-        } = Icons;
-
-        // --- Basic check for Recharts ---
-        if (typeof Recharts === 'undefined') {
-            window.Recharts = {
-                ResponsiveContainer: ({ children }) => <div>{children}</div>,
-                LineChart: () => null, Line: () => null, XAxis: () => null, YAxis: () => null,
-                BarChart: () => null, Bar: () => null,
-                CartesianGrid: () => null, Tooltip: () => null, Legend: () => null
-            };
-        }
-
-        // --- Utils & Presets ---
-        const PRESETS = {
-            M_LEAGUE: {
-                gameType: '4ma',
-                matchType: 'half',
-                uma: [50, 10, -10, -30],
-                oka: 0,
-                initialPoints: 25000,
-                returnPoints: 30000,
-                tieBreak: 'priority'
-            },
-            NET_MAHJONG: {
-                gameType: '4ma',
-                matchType: 'half',
-                uma: [20, 10, -10, -20],
-                oka: 0,
-                initialPoints: 25000,
-                returnPoints: 30000,
-                tieBreak: 'split'
-            }
-        };
-
-        const calculatePoints = (scores, rule) => {
-            const { uma, oka, initialPoints, returnPoints, gameType, tieBreak } = rule;
-            const numPlayers = gameType === '4ma' ? 4 : 3;
-
-            const indexed = scores.map((s, i) => ({ s, i }));
-            indexed.sort((a, b) => {
-                if (b.s !== a.s) return b.s - a.s;
-                return tieBreak === 'priority' ? a.i - b.i : 0;
-            });
-
-            const ranks = new Array(numPlayers).fill(0);
-            if (tieBreak === 'split') {
-                let currentRank = 1;
-                for (let i = 0; i < indexed.length; i++) {
-                    if (i > 0 && indexed[i].s < indexed[i - 1].s) currentRank = i + 1;
-                    ranks[indexed[i].i] = currentRank;
-                }
-            } else {
-                indexed.forEach((item, i) => { ranks[item.i] = i + 1; });
-            }
-
-            const points = scores.map((score, index) => {
-                const rank = ranks[index];
-                let p = (score - returnPoints) / 1000;
-
-                if (tieBreak === 'split') {
-                    const tieCount = ranks.filter(r => r === rank).length;
-                    if (tieCount > 1) {
-                        const startIndex = ranks.indexOf(rank);
-                        let totalUma = 0;
-                        for (let i = 0; i < tieCount; i++) totalUma += (uma[startIndex + i] || 0);
-                        p += (totalUma / tieCount);
-                    } else {
-                        p += (uma[rank - 1] || 0);
-                    }
-                } else {
-                    p += (uma[rank - 1] || 0);
-                }
-
-                if (rank === 1) {
-                    const firstPlaceTieCount = ranks.filter(r => r === 1).length;
-                    p += (oka / 1000) / firstPlaceTieCount;
-                }
-                return parseFloat(p.toFixed(1));
-            });
-
-            return { points, ranks };
-        };
-
-        // --- Store Implementation (Firestore) ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g",
-            authDomain: "mahjongstorage-836e8.firebaseapp.com",
-            databaseURL: "https://mahjongstorage-836e8-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "mahjongstorage-836e8",
-            storageBucket: "mahjongstorage-836e8.firebasestorage.app",
-            messagingSenderId: "618604764916",
-            appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1",
-            measurementId: "G-FRPK9KGTDF"
-        };
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-
-        const AppContext = createContext();
-
-        const AppProvider = ({ children }) => {
-            const [state, setState] = useState({
-                groups: {},
-                players: {},
-                matches: {},
-                currentGroupId: null,
-                currentView: 'onboarding',
-                viewParams: {},
-                isLoading: true, // Start loading initially
-                isAuthenticated: false,
-                error: null
-            });
-
-            // Auth Initialization
-            useEffect(() => {
-                const unsubscribe = auth.onAuthStateChanged(user => {
-                    if (user) {
-                        console.log("Authenticated as:", user.uid);
-                        setState(s => ({ ...s, isAuthenticated: true, isLoading: false }));
-                    } else {
-                        console.log("Signing in anonymously...");
-                        auth.signInAnonymously().catch(error => {
-                            console.error("Auth Error:", error);
-                            setState(s => ({ ...s, error: "Authentication failed: " + error.message, isLoading: false }));
-                        });
-                    }
-                });
-                return () => unsubscribe();
-            }, []);
-
-            // Persist currentGroupId
-            useEffect(() => {
-                const savedGroupId = localStorage.getItem('mahjong_current_group_id');
-                if (savedGroupId) {
-                    setState(s => ({ ...s, currentGroupId: savedGroupId }));
-                }
-            }, []);
-
-            useEffect(() => {
-                if (state.currentGroupId) {
-                    localStorage.setItem('mahjong_current_group_id', state.currentGroupId);
-                } else {
-                    localStorage.removeItem('mahjong_current_group_id');
-                }
-            }, [state.currentGroupId]);
-
-            // Firestore Listeners - ONLY runs when authenticated and groupId exists
-            useEffect(() => {
-                if (!state.isAuthenticated || !state.currentGroupId) return;
-
-                const groupId = state.currentGroupId;
-
-                // Track initialization of each listener
-                let loaded = { group: false, players: false, matches: false };
-
-                // Helper to update global loading state
-                const checkLoading = () => {
-                    if (loaded.group && loaded.players && loaded.matches) {
-                        setState(s => ({
-                            ...s,
-                            isLoading: false,
-                            // Only switch to dashboard if we are still onboarding
-                            currentView: s.currentView === 'onboarding' ? 'dashboard' : s.currentView
-                        }));
-                    }
-                };
-
-                setState(s => ({ ...s, isLoading: true }));
-
-                // 1. Group Metadata Listener
-                const unsubscribeGroup = db.collection('groups').doc(groupId).onSnapshot(doc => {
-                    if (doc.exists) {
-                        setState(s => ({
-                            ...s,
-                            groups: { ...s.groups, [groupId]: doc.data() }
-                        }));
-                        loaded.group = true;
-                        checkLoading();
-                    } else {
-                        setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', error: 'Group not found', isLoading: false }));
-                    }
-                }, err => {
-                    console.error("Group Listener Error:", err);
-                    setState(s => ({ ...s, isLoading: false }));
-                });
-
-                // 2. Players Listener
-                const unsubscribePlayers = db.collection('groups').doc(groupId).collection('players').onSnapshot(snapshot => {
-                    const players = {};
-                    snapshot.forEach(doc => players[doc.id] = doc.data());
-                    setState(s => ({ ...s, players }));
-                    loaded.players = true;
-                    checkLoading();
-                }, err => console.error("Players Listener Error:", err));
-
-                // 3. Matches Listener
-                const unsubscribeMatches = db.collection('groups').doc(groupId).collection('matches').onSnapshot(snapshot => {
-                    const matches = {};
-                    snapshot.forEach(doc => matches[doc.id] = doc.data());
-                    setState(s => ({ ...s, matches }));
-                    loaded.matches = true;
-                    checkLoading();
-                }, err => console.error("Matches Listener Error:", err));
-
-                return () => {
-                    unsubscribeGroup();
-                    unsubscribePlayers();
-                    unsubscribeMatches();
-                };
-            }, [state.currentGroupId, state.isAuthenticated]);
-
-            const actions = {
-                createGroup: async (name, passkey, rules) => {
-                    const user = firebase.auth().currentUser;
-                    if (!user) {
-                        alert("認証情報の取得中またはエラーです。しばらく待ってください。");
-                        return;
-                    }
-                    const id = uuidv4();
-                    const newGroup = {
-                        id,
-                        name,
-                        passkey,
-                        rules,
-                        createdAt: Date.now(),
-                        userId: user.uid
-                    };
-                    try {
-                        await db.collection('groups').doc(id).set(newGroup);
-                        // Let the listener handle the view switch
-                        setState(s => ({ ...s, currentGroupId: id, isLoading: true }));
-                        return id;
-                    } catch (e) {
-                        alert("グループ作成失敗: " + e.message + "\n権限エラーの場合は、しばらく待ってから再試行してください。");
-                        console.error(e);
-                    }
-                },
-                updateGroupRules: async (groupId, rules) => {
-                    try {
-                        await db.collection('groups').doc(groupId).update({ rules });
-                    } catch (e) {
-                        alert("Error updating rules: " + e.message);
-                    }
-                },
-                joinGroup: async (name, passkey) => {
-                    const cleanName = name.trim();
-                    setState(s => ({ ...s, isLoading: true })); // Start loading immediately
-                    try {
-                        // Search by Name instead of ID
-                        const snapshot = await db.collection('groups').where('name', '==', cleanName).limit(1).get();
-
-                        if (!snapshot.empty) {
-                            const doc = snapshot.docs[0];
-                            const group = doc.data();
-                            if (group.passkey === passkey) {
-                                // Set ID and let listener take over. Do NOT force dashboard view yet.
-                                setState(s => ({ ...s, currentGroupId: doc.id }));
-                                return true;
-                            } else {
-                                alert("合言葉が間違っています");
-                                setState(s => ({ ...s, isLoading: false }));
-                            }
-                        } else {
-                            alert(`グループ「${cleanName}」が見つかりません。\n名前が正しいか確認してください。`);
-                            setState(s => ({ ...s, isLoading: false }));
-                        }
-                    } catch (e) {
-                        alert("参加エラー: " + e.message);
-                        console.error(e);
-                        setState(s => ({ ...s, isLoading: false }));
-                    }
-                    return false;
-                },
-                addPlayer: async (name) => {
-                    if (!state.currentGroupId) return;
-                    const user = firebase.auth().currentUser;
-                    const id = uuidv4();
-                    const newPlayer = {
-                        id,
-                        name,
-                        groupId: state.currentGroupId,
-                        joinedAt: Date.now(),
-                        userId: user ? user.uid : null
-                    };
-                    try {
-                        await db.collection('groups').doc(state.currentGroupId).collection('players').doc(id).set(newPlayer);
-                        return id;
-                    } catch (e) {
-                        console.error(e);
-                    }
-                },
-                addMatch: async (matchData) => {
-                    if (!state.currentGroupId) return;
-                    const user = firebase.auth().currentUser;
-                    const id = uuidv4();
-                    const newMatch = {
-                        ...matchData,
-                        id,
-                        timestamp: matchData.timestamp || Date.now(),
-                        userId: user ? user.uid : null
-                    };
-                    try {
-                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).set(newMatch);
-                    } catch (e) {
-                        console.error(e);
-                    }
-                },
-                editMatch: async (id, matchData) => {
-                    if (!state.currentGroupId) return;
-                    // Preserve timestamp if not provided, else update
-                    try {
-                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).update(matchData);
-                    } catch (e) {
-                        console.error(e);
-                    }
-                },
-                deleteMatch: async (id) => {
-                    if (!state.currentGroupId) return;
-                    try {
-                        await db.collection('groups').doc(state.currentGroupId).collection('matches').doc(id).delete();
-                    } catch (e) {
-                        console.error(e);
-                    }
-                },
-                navigate: (view, params = {}) => setState(s => ({ ...s, currentView: view, viewParams: params })),
-                leaveGroup: () => setState(s => ({ ...s, currentGroupId: null, currentView: 'onboarding', groups: {}, players: {}, matches: {} })),
-                getGroupPlayers: (groupId) => Object.values(state.players), // Filtered by listener already
-                getGroupMatches: (groupId) => Object.values(state.matches).sort((a, b) => b.timestamp - a.timestamp)
-            };
-
-            return <AppContext.Provider value={{ ...state, ...actions }}>{children}</AppContext.Provider>;
-        };
-
-        const useStore = () => useContext(AppContext);
-
-        // --- Elements ---
-        const Button = ({ children, variant = "primary", className = "", size = "md", ...props }) => {
-            const variants = { primary: 'bg-emerald-500 text-white', secondary: 'bg-gray-200 text-gray-800', outline: 'border border-gray-300', ghost: 'hover:bg-gray-100' };
-            const sizes = { sm: 'h-8 px-3 text-xs', md: 'h-10 px-4', lg: 'h-12 px-6 text-lg font-bold' };
-            return <button className={`inline-flex items-center justify-center rounded-xl font-medium transition-all ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
-        };
-        const Card = ({ children, className = "" }) => <div className={`glass-card p-4 ${className}`}>{children}</div>;
-        const Input = ({ className = "", ...props }) => <input className={`flex h-10 w-full rounded-lg border px-3 text-sm focus:ring-emerald-500 ${className}`} {...props} />;
-        const Badge = ({ children, variant = "secondary" }) => <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${variant === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100'}`}>{children}</span>;
-
-        const Layout = ({ children, hideNav }) => {
-            const { currentView, currentGroupId, groups, navigate } = useStore();
-            const group = groups[currentGroupId];
-            return (
-                <div className="flex flex-col min-h-screen">
-                    <header className="sticky top-0 z-40 w-full glass border-b px-4 h-16 flex items-center justify-between">
-                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate(currentGroupId ? 'dashboard' : 'onboarding')}>
-                            <span className="font-black text-xl tracking-tighter text-emerald-500">MAHJONG <span className="text-gray-900">TRACKER</span></span>
-                            {group && <Badge>{group.name}</Badge>}
-                        </div>
-                        {group && (
-                            <div className="flex flex-col items-end text-[10px] text-gray-500 font-bold leading-tight">
-                                <div>{group.rules.uma.join('/')} / オカ {group.rules.oka.toLocaleString()}</div>
-                                <div className="flex gap-2">
-                                    <span>{group.rules.gameType === '4ma' ? '4人' : '3人'}</span>
-                                    <span>{group.rules.matchType === 'half' ? '半荘' : '東風'}</span>
-                                    <button onClick={() => navigate('settings')} className="text-emerald-500 underline ml-1">設定</button>
-                                </div>
-                            </div>
-                        )}
-                    </header>
-                    <main className="flex-1 pb-24">{children}</main>
-                    {!hideNav && currentGroupId && (
-                        <nav className="fixed bottom-0 left-0 w-full h-16 glass border-t flex items-center justify-around pb-safe z-50">
-                            <button onClick={() => navigate('dashboard')} className={currentView === 'dashboard' ? 'text-emerald-500' : 'text-gray-400'}><LayoutDashboard size={20} /></button>
-                            <button onClick={() => navigate('history')} className={currentView === 'history' ? 'text-emerald-500' : 'text-gray-400'}><History size={20} /></button>
-                            <button onClick={() => navigate('newMatch')} className="relative -top-3 bg-emerald-500 p-4 rounded-full text-white shadow-xl hover:scale-105 active:scale-95 transition-transform"><Plus size={24} /></button>
-                            <button onClick={() => navigate('analytics')} className={currentView === 'analytics' ? 'text-emerald-500' : 'text-gray-400'}><BarChart2 size={20} /></button>
-                            <button onClick={() => navigate('settings')} className={currentView === 'settings' ? 'text-emerald-500' : 'text-gray-400'}><Settings size={20} /></button>
-                        </nav>
-                    )}
+        <div v-if="tab === 'dashboard' && !selectedPlayer">
+            <div class="d-flex gap-2 mb-4">
+                <div class="summary-box">
+                    <span class="x-small text-muted d-block">平均順位</span>
+                    <span class="val-large">{{ globalStats.avgRank }}<small class="x-small text-muted fw-normal">位</small></span>
                 </div>
-            );
-        };
+                <div class="summary-box">
+                    <span class="x-small text-muted d-block">平均和了</span>
+                    <span class="val-large">{{ globalStats.avgScore }}</span>
+                </div>
+                <div class="summary-box">
+                    <span class="x-small text-muted d-block">平均放銃</span>
+                    <span class="val-large text-danger">{{ globalStats.avgLoseRate }}%</span>
+                </div>
+            </div>
 
-        const RuleForm = ({ initialRules, onSubmit, onCancel, submitLabel = "保存" }) => {
-            const [rules, setRules] = useState(initialRules || PRESETS.M_LEAGUE);
-            const updateUma = (idx, val) => {
-                const newUma = [...rules.uma];
-                newUma[idx] = parseInt(val) || 0;
-                setRules({ ...rules, uma: newUma });
-            };
-            return (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button type="button" variant={rules.gameType === '4ma' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, gameType: '4ma', uma: [50, 10, -10, -30] })}>4人打ち</Button>
-                        <Button type="button" variant={rules.gameType === '3ma' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, gameType: '3ma', uma: [30, 0, -30] })}>3人打ち</Button>
+            <div v-for="(s, i) in playerStats" :key="s.name" class="card p-3 mb-2 d-flex flex-row align-items-center shadow-sm click-effect" @click="openPlayerDetail(s)">
+                <div class="me-3 fw-bold" :class="i===0?'text-warning':(i===1?'text-secondary':'text-muted')" style="width:20px; font-size:1.2rem;">{{ i+1 }}</div>
+                <div class="flex-grow-1">
+                    <div class="fw-bold">{{ s.name }}</div>
+                    <div class="x-small text-muted">
+                        {{ s.games }}戦 / 平均順位 {{ s.avgRank }} / 和了率 {{s.winRate}}%
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button type="button" variant={rules.matchType === 'half' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, matchType: 'half', initialPoints: 25000, returnPoints: 30000, oka: 0 })}>半荘</Button>
-                        <Button type="button" variant={rules.matchType === 'east' ? 'primary' : 'outline'} className="text-xs" onClick={() => setRules({ ...rules, matchType: 'east', initialPoints: 20000, returnPoints: 25000, oka: 0 })}>東風</Button>
+                </div>
+                <div class="text-end fw-bold fs-5" :class="s.totalScore >= 0 ? 'text-success':'text-danger'">
+                    {{ s.totalScore >= 0 ? '+':'' }}{{ s.totalScore }}
+                </div>
+            </div>
+        </div>
+
+        <div v-if="selectedPlayer" class="animate__animated animate__fadeIn">
+            <button class="btn btn-link text-dark p-0 mb-3 text-decoration-none" @click="selectedPlayer = null"><i class="bi bi-chevron-left"></i> 戻る</button>
+            <div class="card p-4 mb-3 border-0 bg-white shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0">{{ selectedPlayer.name }}</h5>
+                    <span class="badge rounded-pill p-2 px-3" :class="selectedPlayer.totalScore >= 0 ? 'bg-success':'bg-danger'">{{ selectedPlayer.totalScore }} pt</span>
+                </div>
+                
+                <div class="stat-grid mb-4">
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">平均着順</small>
+                        <strong class="h5 m-0">{{ selectedPlayer.avgRank }}<small class="fs-6 fw-normal">位</small></strong>
                     </div>
-                    <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-gray-400">ウマ (1位 / 2位 / 3位 / 4位)</span>
-                        <div className="flex gap-2">
-                            {rules.uma.map((u, i) => (
-                                <Input key={i} type="number" value={u} onChange={e => updateUma(i, e.target.value)} className="text-center p-1" />
-                            ))}
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">平均収支</small>
+                        <strong class="h5 m-0" :class="selectedPlayer.avgScorePerGame>=0?'text-success':'text-danger'">{{ selectedPlayer.avgScorePerGame }}</strong>
+                    </div>
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">平均和了</small>
+                        <strong class="h5 m-0">{{ selectedPlayer.avgHand }}</strong>
+                    </div>
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">平均放銃</small>
+                        <strong class="h5 m-0 text-danger">{{ selectedPlayer.avgLoseScore }}</strong>
+                    </div>
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">最大打点</small>
+                        <strong class="h5 m-0 text-primary">{{ selectedPlayer.maxHand }}</strong>
+                    </div>
+                    <div class="stat-item">
+                        <small class="text-muted d-block x-small">最大放銃</small>
+                        <strong class="h5 m-0 text-danger">{{ selectedPlayer.maxLose }}</strong>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold x-small text-muted mb-2">役分布 (Top 5)</h6>
+                <div style="height: 200px;"><canvas id="yakuPieChart"></canvas></div>
+            </div>
+        </div>
+
+        <div v-if="tab === 'chart'">
+            <div class="card p-4 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h6 class="fw-bold m-0">収支推移</h6>
+                    <select v-model="chartMode" class="form-select form-select-sm w-auto rounded-pill border-0 bg-light">
+                        <option value="top4">上位4名</option>
+                        <option value="all">全員</option>
+                    </select>
+                </div>
+                <div style="height: 350px;"><canvas id="scoreChart"></canvas></div>
+            </div>
+        </div>
+
+        <div v-if="tab === 'input'">
+             <div class="card p-4 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                     <h6 class="fw-bold m-0">対局記録</h6>
+                     <button class="btn btn-sm btn-outline-danger rounded-pill x-small" @click="inputForm.logs=[]; inputForm.rawScores=[25000,25000,25000,25000]">リセット</button>
+                </div>
+                
+                <div class="row g-2 mb-4">
+                    <div v-for="(p, i) in inputForm.players" :key="i" class="col-6">
+                        <div class="p-2 border rounded-4 bg-light text-center position-relative">
+                            <input type="text" v-model="inputForm.players[i]" class="form-control form-control-sm border-0 bg-transparent text-center fw-bold mb-1 p-0" placeholder="名前">
+                            <input type="number" v-model.number="inputForm.rawScores[i]" class="form-control form-control-sm border-0 bg-transparent text-center text-primary h5 m-0 p-0 fw-bold">
+                            <div class="position-absolute top-0 start-0 m-1 x-small text-muted fw-bold">{{ ['東','南','西','北'][i] }}</div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-gray-400">オカ (合計)</span>
-                            <Input type="number" value={rules.oka} onChange={e => setRules({ ...rules, oka: parseInt(e.target.value) || 0 })} />
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-bold text-muted">和了・放銃ログ ({{ inputForm.logs.length }})</span>
+                        <button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" @click="openHandModal()">
+                            <i class="bi bi-plus-lg"></i> 追加
+                        </button>
+                    </div>
+                    <div v-if="inputForm.logs.length === 0" class="text-center text-muted small py-3 bg-light rounded-3">
+                        記録はありません
+                    </div>
+                    <div v-for="(l, idx) in inputForm.logs" class="bg-white border p-2 rounded-3 mb-2 small d-flex justify-content-between align-items-center shadow-sm">
+                        <div>
+                            <span class="badge bg-light text-dark border me-2">{{ l.roundName }}</span>
+                            <span class="fw-bold">{{ l.winner }}</span> 
+                            <span v-if="l.loser" class="text-muted mx-1">←</span> 
+                            <span v-if="l.loser" class="text-danger">{{ l.loser }}</span>
+                            <span v-else class="badge bg-success ms-1" style="font-size:0.6rem">ツモ</span>
                         </div>
-                        <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-gray-400">返り点</span>
-                            <Input type="number" value={rules.returnPoints} onChange={e => setRules({ ...rules, returnPoints: parseInt(e.target.value) || 0 })} />
+                        <div class="d-flex align-items-center">
+                            <span class="fw-bold me-2">{{ l.score }}</span>
+                            <button class="btn btn-link text-muted p-0" @click="inputForm.logs.splice(idx, 1)"><i class="bi bi-x-circle-fill"></i></button>
                         </div>
                     </div>
-                    <div className="space-y-1">
-                        <span className="text-[10px] font-bold text-gray-400">同点時の順位</span>
-                        <select className="w-full h-10 border rounded-lg text-sm px-2" value={rules.tieBreak} onChange={e => setRules({ ...rules, tieBreak: e.target.value })}>
-                            <option value="priority">起家に近い順</option>
-                            <option value="split">分け (等分)</option>
+                </div>
+                <button class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-lg" @click="saveGame">結果を保存</button>
+            </div>
+        </div>
+
+        <div v-if="tab === 'history'">
+            <div v-for="g in games" :key="g.id" class="card p-3 mb-2 shadow-sm">
+                <div class="d-flex justify-content-between x-small text-muted mb-2">
+                    <span>{{ formatDate(g.d) }}</span>
+                    <span>{{ g.config?.uma || '10-20' }} / {{ g.config?.kaeshi ? g.config.kaeshi/10000 + '万返し' : '-'}}</span>
+                </div>
+                <div class="row g-1">
+                    <div v-for="(p, i) in g.p" :key="i" class="col-6 small d-flex justify-content-between px-2 align-items-center">
+                        <span class="text-truncate">{{ p }}</span>
+                        <span class="fw-bold" :class="g.s[i] >= 0 ? 'text-success':'text-danger'">{{ g.s[i] }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="tab === 'settings'">
+            <div class="card p-4 mb-3">
+                <h6 class="fw-bold mb-3">対局ルール設定</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="x-small text-muted">返し点</label>
+                        <select v-model.number="roomConfig.kaeshi" class="form-select form-select-sm bg-light border-0">
+                            <option :value="25000">25,000</option>
+                            <option :value="30000">30,000</option>
                         </select>
                     </div>
-                    <div className="flex gap-2 pt-2">
-                        {onCancel && <Button variant="secondary" className="flex-1" onClick={onCancel}>キャンセル</Button>}
-                        <Button className="flex-1" onClick={() => onSubmit(rules)}>{submitLabel}</Button>
+                    <div class="col-6">
+                        <label class="x-small text-muted">オカ</label>
+                        <input type="number" v-model.number="roomConfig.oka" class="form-control form-control-sm bg-light border-0">
+                    </div>
+                    <div class="col-12">
+                        <label class="x-small text-muted">ウマ (1位-2位-3位-4位)</label>
+                        <input type="text" v-model="roomConfig.uma" class="form-control form-control-sm bg-light border-0" placeholder="10-20 (または 20-10--10--20)">
                     </div>
                 </div>
-            );
-        };
-
-        const OnboardingView = () => {
-            const { createGroup, joinGroup } = useStore();
-            const [tab, setTab] = useState('join');
-            const [name, setName] = useState('');
-            const [id, setId] = useState(''); // This is no longer used for joining, but kept for potential future use or if other parts of the code still reference it.
-            const [pass, setPass] = useState('');
-            const [showRules, setShowRules] = useState(false);
-            const [rules, setRules] = useState(PRESETS.M_LEAGUE);
-
-            return (
-                <div className="p-6 pt-12 max-w-md mx-auto space-y-8">
-                    <h1 className="text-4xl font-black text-center">対局を、<br /><span className="text-emerald-500">もっと美しく。</span></h1>
-                    <Card className="p-1">
-                        <div className="flex bg-gray-100 p-1 rounded-lg">
-                            <button onClick={() => setTab('join')} className={`flex-1 py-2 text-sm font-bold ${tab === 'join' ? 'bg-white shadow-sm' : ''}`}>参加</button>
-                            <button onClick={() => setTab('create')} className={`flex-1 py-2 text-sm font-bold ${tab === 'create' ? 'bg-white shadow-sm' : ''}`}>作成</button>
-                        </div>
-                        <div className="p-4 pt-6">
-                            {tab === 'join' ? (
-                                <form className="space-y-4" onSubmit={e => { e.preventDefault(); joinGroup(name, pass); }}>
-                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="グループ名" />
-                                    <Input type="password" value={pass} onChange={e => setPass(e.target.value)} placeholder="合言葉" />
-                                    <Button type="submit" className="w-full h-12">グループに入る</Button>
-                                </form>
-                            ) : (
-                                <div className="space-y-4">
-                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="グループ名" />
-                                    <Input value={pass} onChange={e => setPass(e.target.value)} placeholder="合言葉" />
-
-                                    {!showRules ? (
-                                        <div className="space-y-3">
-                                            <div className="text-[10px] text-gray-400 font-bold px-1">基本設定: {rules.gameType === '4ma' ? '4人' : '3人'} / {rules.matchType === 'half' ? '半荘' : '東風'}</div>
-                                            <Button variant="outline" className="w-full text-xs" onClick={() => setShowRules(true)}>ルール詳細を設定する</Button>
-                                            <Button className="w-full h-12" onClick={() => createGroup(name, pass, rules)}>新規作成</Button>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-gray-50 p-3 rounded-lg border">
-                                            <h4 className="text-xs font-bold mb-3 border-b pb-1">ルール詳細設定</h4>
-                                            <RuleForm initialRules={rules} onSubmit={(r) => { setRules(r); setShowRules(false); }} onCancel={() => setShowRules(false)} submitLabel="反映して戻る" />
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    </Card>
+                <div class="bg-light p-3 rounded-3">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" v-model="roomConfig.kiriage">
+                        <label class="form-check-label small">切り上げ満貫 (30符4翻/60符3翻→満貫)</label>
+                    </div>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" v-model="roomConfig.doubleYakuman">
+                        <label class="form-check-label small">ダブル役満有効 (純粋な2倍役満)</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" v-model="roomConfig.localYaku">
+                        <label class="form-check-label small">ローカル役を表示</label>
+                    </div>
                 </div>
-            );
-        };
+            </div>
+            <button class="btn btn-outline-danger w-100 rounded-pill" @click="logout">ログアウト</button>
+        </div>
 
-        const DashboardView = () => {
-            const { currentGroupId, groups, getGroupPlayers, getGroupMatches, players: allPlayers, navigate, isLoading } = useStore();
-            const group = groups[currentGroupId];
-            const players = getGroupPlayers(currentGroupId);
-            const matches = getGroupMatches(currentGroupId);
-
-            // FIX: Show Loading instead of Null(White Screen)
-            if (!group) {
-                if (isLoading) return <LoadingView />;
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center space-y-4">
-                        <div className="text-gray-400">グループデータを読み込めませんでした。</div>
-                        <Button onClick={() => navigate('onboarding')}>トップに戻る</Button>
-                    </div>
-                );
-            }
-
-            const ranking = useMemo(() => {
-                const s = {};
-                players.forEach(p => s[p.id] = { id: p.id, name: p.name, points: 0, count: 0 });
-                matches.forEach(m => m.players.forEach((pid, i) => { if (s[pid]) { s[pid].points += m.points[i]; s[pid].count++; } }));
-                return Object.values(s).sort((a, b) => b.points - a.points);
-            }, [players, matches]);
-
-            return (
-                <div className="p-4 space-y-6 max-w-2xl mx-auto pb-32">
-                    <div className="flex justify-between items-end">
-                        <h2 className="text-3xl font-black">{group.name}</h2>
-                        <div
-                            className="text-[10px] font-bold text-gray-400 cursor-pointer hover:text-emerald-500 flex items-center gap-1"
-                            onClick={() => {
-                                navigator.clipboard.writeText(group.id);
-                                alert("グループIDをコピーしました: " + group.id);
-                            }}
-                        >
-                            <Copy size={12} />
-                            ID: {group.id}
+        <div v-if="showHandModal" class="modal d-block" style="background:rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index:2000; overflow-y:auto;">
+            <div class="modal-dialog modal-dialog-centered px-2">
+                <div class="modal-content rounded-4 border-0 shadow-lg animate__animated animate__slideInUp">
+                    <div class="modal-body p-3">
+                        <h6 class="text-center fw-bold mb-3">和了詳細入力</h6>
+                        
+                        <div class="row g-1 mb-2">
+                            <div class="col-4">
+                                <select v-model="handForm.ba" class="form-select form-select-sm rounded-pill text-center"><option value="0">東</option><option value="1">南</option><option value="2">西</option></select>
+                            </div>
+                            <div class="col-4">
+                                <select v-model="handForm.kyoku" class="form-select form-select-sm rounded-pill text-center"><option v-for="n in 4" :value="n">{{n}}局</option></select>
+                            </div>
+                            <div class="col-4">
+                                <select v-model="handForm.honba" class="form-select form-select-sm rounded-pill text-center"><option value="0">0本場</option><option v-for="n in 20" :value="n">{{n}}本場</option></select>
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                        <Card className="text-center py-4"><div className="text-xl font-black">{matches.length}</div><span className="text-[8px] text-gray-400 font-bold">対局数</span></Card>
-                        <Card className="text-center py-4"><div className="text-xl font-black">{players.length}</div><span className="text-[8px] text-gray-400 font-bold">人数</span></Card>
-                        <Card className="text-center py-4" onClick={() => navigate('analytics')}><div className="text-xl font-black text-emerald-500"><TrendingUp size={20} className="mx-auto" /></div><span className="text-[8px] text-gray-400 font-bold">分析</span></Card>
-                    </div>
-
-                    <section className="space-y-3">
-                        <div className="flex justify-between items-center"><h3 className="font-bold flex items-center gap-2"><Trophy size={18} className="text-amber-400" />ランキング</h3></div>
-                        <Card className="p-0 overflow-hidden divide-y">
-                            {ranking.slice(0, 5).map((r, i) => (
-                                <div key={r.id} className="flex items-center justify-between p-3 bg-white hover:bg-gray-50 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black ${i === 0 ? 'bg-amber-400 text-white' : i === 1 ? 'bg-slate-300 text-white' : i === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-400'}`}>{i + 1}</span>
-                                        <span className="font-bold text-sm">{r.name}</span>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className={`text-sm font-black ${r.points >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{r.points > 0 ? `+${r.points.toFixed(1)}` : r.points.toFixed(1)}</div>
-                                        <div className="text-[8px] text-gray-400 font-bold">{r.count}戦</div>
+                        <div class="card bg-light border-0 p-2 mb-2">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-5">
+                                    <label class="x-small text-muted ms-1">和了</label>
+                                    <select v-model="handForm.winnerIdx" class="form-select form-select-sm fw-bold"><option v-for="(p,i) in inputForm.players" :value="i">{{p}}</option></select>
+                                    <div class="form-check mt-1 ms-1">
+                                        <input class="form-check-input" type="checkbox" v-model="handForm.isWinnerDealer" id="chkDealer">
+                                        <label class="form-check-label x-small" for="chkDealer">親番</label>
                                     </div>
                                 </div>
-                            ))}
-                        </Card>
-                    </section>
-
-                    <section className="space-y-3">
-                        <div className="flex justify-between items-center"><h3 className="font-bold flex items-center gap-2"><History size={18} />直近の対局</h3><button onClick={() => navigate('history')} className="text-[10px] text-emerald-500 font-bold">すべて見る</button></div>
-                        <div className="grid gap-3">
-                            {matches.slice(0, 3).map(m => (
-                                <Card key={m.id} className="p-3 border-l-4 border-emerald-500 flex flex-col gap-2">
-                                    <div className="text-[9px] text-gray-400 font-bold">{new Date(m.timestamp).toLocaleString()}</div>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {m.points.map((pt, i) => (
-                                            <div key={i} className="text-center">
-                                                <div className="text-[8px] text-gray-500 truncate font-bold">{allPlayers[m.players[i]]?.name || '---'}</div>
-                                                <div className={`text-xs font-black ${pt >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{pt > 0 ? `+${pt}` : pt}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-                            ))}
+                                <div class="col-2 text-center text-muted"><i class="bi bi-arrow-left"></i></div>
+                                <div class="col-5">
+                                    <label class="x-small text-muted ms-1">放銃 (空=ツモ)</label>
+                                    <select v-model="handForm.loserIdx" class="form-select form-select-sm"><option :value="null">ツモ</option><option v-for="(p,i) in inputForm.players" :value="i" v-show="i!==handForm.winnerIdx">{{p}}</option></select>
+                                </div>
+                            </div>
                         </div>
-                    </section>
+
+                        <div class="btn-group w-100 mb-2 bg-light rounded-pill p-1">
+                            <button class="btn btn-sm rounded-pill py-1" :class="handForm.isMenzen?'bg-white shadow-sm fw-bold':''" @click="handForm.isMenzen=true">門前</button>
+                            <button class="btn btn-sm rounded-pill py-1" :class="!handForm.isMenzen?'bg-white shadow-sm fw-bold':''" @click="handForm.isMenzen=false">副露</button>
+                        </div>
+                        <div class="row g-1 mb-3 overflow-auto p-1" style="max-height: 180px;">
+                            <div v-for="y in filteredYaku" :key="y.id" class="col-4">
+                                <div class="yaku-node shadow-sm" :class="{active: handForm.selectedYaku.includes(y.id), disabled: !canSelectYaku(y)}" @click="toggleYaku(y)">{{ y.name }}</div>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3 align-items-center">
+                            <div class="col-4">
+                                <label class="x-small text-muted ps-1">符</label>
+                                <select v-model.number="handForm.fu" class="form-select form-select-sm rounded-pill text-center">
+                                    <option v-for="f in [20,25,30,40,50,60,70,80,90,100,110]" :value="f">{{f}}符</option>
+                                </select>
+                            </div>
+                            <div class="col-8">
+                                <div class="d-flex justify-content-end gap-2">
+                                     <div class="form-check form-switch x-small pt-1">
+                                        <input class="form-check-input" type="checkbox" v-model="roomConfig.kiriage">
+                                        <label class="form-check-label text-muted">切上</label>
+                                    </div>
+                                    <div class="form-check form-switch x-small pt-1">
+                                        <input class="form-check-input" type="checkbox" v-model="roomConfig.doubleYakuman">
+                                        <label class="form-check-label text-muted">W役満</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-dark text-white p-3 rounded-4 text-center mb-3 position-relative overflow-hidden">
+                            <div class="position-absolute top-0 start-0 w-100 h-100" style="background: linear-gradient(45deg, #10b981, #059669); opacity:0.1;"></div>
+                            <div class="h2 fw-black m-0 position-relative" style="letter-spacing: 1px;">{{ calculatedResult.score }}</div>
+                            <small class="d-block text-white-50 position-relative">{{ calculatedResult.text }}</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-light flex-grow-1 rounded-pill" @click="showHandModal=false">キャンセル</button>
+                            <button class="btn btn-success flex-grow-1 rounded-pill fw-bold" @click="addHandLog">決定</button>
+                        </div>
+                    </div>
                 </div>
-            );
-        };
+            </div>
+        </div>
 
-        const NewMatchView = () => {
-            const { currentGroupId, groups, getGroupPlayers, addMatch, addPlayer, navigate, viewParams, editMatch } = useStore();
-            const group = groups[currentGroupId];
-            const players = getGroupPlayers(currentGroupId);
-            const num = group.rules.gameType === '4ma' ? 4 : 3;
-            const targetScore = num === 4 ? (group.rules.initialPoints * 4 + group.rules.oka) : (group.rules.initialPoints * 3 + group.rules.oka);
+        <nav class="nav-bottom">
+            <button class="nav-item" :class="{active: tab==='dashboard'}" @click="tab='dashboard'; selectedPlayer=null"><i class="bi bi-house-door-fill"></i></button>
+            <button class="nav-item" :class="{active: tab==='history'}" @click="tab='history'; selectedPlayer=null"><i class="bi bi-clock-history"></i></button>
+            <button class="nav-item" @click="tab='input'; selectedPlayer=null"><div class="btn-plus-fixed"><i class="bi bi-plus-lg"></i></div></button>
+            <button class="nav-item" :class="{active: tab==='chart'}" @click="tab='chart'; selectedPlayer=null"><i class="bi bi-graph-up-arrow"></i></button>
+            <button class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'; selectedPlayer=null"><i class="bi bi-gear-wide-connected"></i></button>
+        </nav>
+    </div>
+</div>
 
-            const editingMatch = viewParams.editId ? groups[currentGroupId].matches[viewParams.editId] : null;
+<script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-            const [selected, setSelected] = useState(editingMatch?.players || new Array(num).fill(''));
-            const [scores, setScores] = useState(editingMatch?.scores || new Array(num).fill(0));
-            const [date, setDate] = useState(new Date(editingMatch?.timestamp || Date.now()).toISOString().slice(0, 10));
-            const [startTime, setStartTime] = useState(editingMatch?.startTime || '12:00');
-            const [endTime, setEndTime] = useState(editingMatch?.endTime || '13:00');
-            const [memo, setMemo] = useState(editingMatch?.memo || '');
-            const [hands, setHands] = useState(editingMatch?.hands || []);
-            const [isPreview, setIsPreview] = useState(false);
-            const [isAddingPlayer, setIsAddingPlayer] = useState(false);
-            const [newName, setNewName] = useState('');
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-            const result = useMemo(() => {
-                if (scores.some(s => isNaN(parseInt(s)))) return null;
-                return calculatePoints(scores.map(s => parseInt(s)), group.rules);
-            }, [scores, group]);
+    const firebaseConfig = { apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g", authDomain: "mahjongstorage-836e8.firebaseapp.com", projectId: "mahjongstorage-836e8", storageBucket: "mahjongstorage-836e8.firebasestorage.app", messagingSenderId: "618604764916", appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1" };
+    
+    // --- 定数 ---
+    const YAKU_MASTER = [
+        { id: 1, name: '立直', m: 1, f: 0 }, { id: 2, name: '断幺九', m: 1, f: 1 }, { id: 3, name: '平和', m: 1, f: 0 }, { id: 4, name: '一発', m: 1, f: 0 },
+        { id: 11, name: '門前自摸', m: 1, f: 0 }, { id: 12, name: '役牌', m: 1, f: 1 }, { id: 13, name: '嶺上開花', m: 1, f: 1 }, { id: 14, name: '海底/河底', m: 1, f: 1 },
+        { id: 5, name: '三色同順', m: 2, f: 1 }, { id: 6, name: '一気通貫', m: 2, f: 1 }, { id: 7, name: '混一色', m: 3, f: 2 }, { id: 8, name: '清一色', m: 6, f: 5 },
+        { id: 9, name: '七対子', m: 2, f: 0, fixedFu: 25 }, { id: 10, name: '対々和', m: 2, f: 2 }, { id: 15, name: '三暗刻', m: 2, f: 2 }, { id: 16, name: '三色同刻', m: 2, f: 2 },
+        { id: 17, name: '混老頭', m: 2, f: 2 }, { id: 18, name: '小三元', m: 2, f: 2 }, { id: 19, name: '純全帯', m: 3, f: 2 }, { id: 20, name: '二盃口', m: 3, f: 0 },
+        { id: 101, name: '大三元', yakuman: true }, { id: 102, name: '四暗刻', yakuman: true }, { id: 103, name: '国士無双', yakuman: true },
+        { id: 105, name: '字一色', yakuman: true }, { id: 106, name: '緑一色', yakuman: true }, { id: 107, name: '清老頭', yakuman: true },
+        { id: 108, name: '小四喜', yakuman: true }, { id: 109, name: '大四喜', yakuman: true, double: true }, { id: 110, name: '四暗刻単騎', yakuman: true, double: true },
+        { id: 111, name: '国士13面', yakuman: true, double: true }, { id: 112, name: '九蓮宝燈', yakuman: true }, { id: 113, name: '純正九蓮', yakuman: true, double: true },
+        { id: 114, name: '天和/地和', yakuman: true }, 
+        { id: 200, name: '大車輪', yakuman: true, local: true }
+    ];
 
-            const sum = scores.reduce((a, b) => a + (parseInt(b) || 0), 0);
-            const isValid = sum === targetScore && selected.every(s => s !== '');
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const { createApp, ref, computed, watch, nextTick } = Vue;
 
-            const addHand = () => setHands([...hands, {
-                yaku: [],
-                han: 0,
-                fu: 30,
-                points: 0,
-                winner: '',
-                loser: '',
-                type: 'ron',
-                isDealer: false,
-                isOpen: false,  // 食い下がり（鳴いているか）
-                ba: '東',       // 場
-                kyoku: 1,       // 局
-                honba: 0        // 本場
-            }]);
-            const updateHand = (idx, field, val) => {
-                const newHands = [...hands];
-                newHands[idx][field] = val;
-                setHands(newHands);
-            };
+    createApp({
+        setup() {
+            const currentRoomId = ref(null);
+            const authMode = ref('login');
+            const tab = ref('dashboard');
+            const loginForm = ref({ room: '', pass: '' });
+            const games = ref([]);
+            const roomConfig = ref({ kaeshi: 30000, oka: 20, uma: '10-20', doubleYakuman: true, kiriage: false, localYaku: false });
+            const inputForm = ref({ players: ['P1','P2','P3','P4'], rawScores: [25000,25000,25000,25000], logs: [] });
+            
+            // Hand Form Initial State
+            const initHandForm = { winnerIdx:0, loserIdx:null, isMenzen: true, selectedYaku:[], ba: 0, kyoku: 1, honba: 0, fu: 30, isWinnerDealer: false };
+            const handForm = ref({ ...initHandForm });
+            
+            const showHandModal = ref(false);
+            const selectedPlayer = ref(null);
+            const chartMode = ref('top4');
+            let lineChart = null, pieChart = null;
 
-            // 役データ（翻数付き）
-            const YAKU_DATA = {
-                // 1翻役
-                "立直": { han: 1, isMenzenOnly: true },
-                "一発": { han: 1, isMenzenOnly: true },
-                "断么九": { han: 1 },
-                "役牌(白)": { han: 1 },
-                "役牌(發)": { han: 1 },
-                "役牌(中)": { han: 1 },
-                "役牌(自風)": { han: 1 },
-                "役牌(場風)": { han: 1 },
-                "平和": { han: 1, isMenzenOnly: true },
-                "一盃口": { han: 1, isMenzenOnly: true },
-                "門前清自模和": { han: 1, isMenzenOnly: true },
-                "嶺上開花": { han: 1 },
-                "槍槓": { han: 1 },
-                "海底摸月": { han: 1 },
-                "河底撈魚": { han: 1 },
-                // 2翻役
-                "ダブル立直": { han: 2, isMenzenOnly: true },
-                "対々和": { han: 2 },
-                "三暗刻": { han: 2 },
-                "三色同刻": { han: 2 },
-                "三色同順": { han: 2, openHanReduction: 1 },
-                "一気通貫": { han: 2, openHanReduction: 1 },
-                "チャンタ": { han: 2, openHanReduction: 1 },
-                "混老頭": { han: 2 },
-                "七対子": { han: 2, isMenzenOnly: true },
-                "小三元": { han: 2 },
-                "三槓子": { han: 2 },
-                "混一色": { han: 3, openHanReduction: 1 },
-                // 3翻役
-                "純全帯么九": { han: 3, openHanReduction: 1 },
-                "二盃口": { han: 3, isMenzenOnly: true },
-                // 6翻役
-                "清一色": { han: 6, openHanReduction: 1 },
-                // 役満
-                "国士無双": { han: 13, isMenzenOnly: true, isYakuman: true },
-                "国士無双13面待ち": { han: 26, isMenzenOnly: true, isYakuman: true },
-                "四暗刻": { han: 13, isMenzenOnly: true, isYakuman: true },
-                "四暗刻単騎": { han: 26, isMenzenOnly: true, isYakuman: true },
-                "大三元": { han: 13, isYakuman: true },
-                "字一色": { han: 13, isYakuman: true },
-                "小四喜": { han: 13, isYakuman: true },
-                "大四喜": { han: 26, isYakuman: true },
-                "緑一色": { han: 13, isYakuman: true },
-                "清老頭": { han: 13, isYakuman: true },
-                "九蓮宝燈": { han: 13, isMenzenOnly: true, isYakuman: true },
-                "純正九蓮宝燈": { han: 26, isMenzenOnly: true, isYakuman: true },
-                "四槓子": { han: 13, isYakuman: true },
-                "天和": { han: 13, isMenzenOnly: true, isYakuman: true },
-                "地和": { han: 13, isMenzenOnly: true, isYakuman: true },
-                // ローカル役
-                "人和": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
-                "流し満貫": { han: 5, isLocal: true },
-                "三連刻": { han: 2, isLocal: true },
-                "一色三順": { han: 3, isLocal: true, openHanReduction: 1 },
-                "大車輪": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
-                "百万石": { han: 13, isLocal: true, isYakuman: true },
-                "紅孔雀": { han: 13, isLocal: true, isYakuman: true },
-                "オープンリーチ": { han: 2, isMenzenOnly: true, isLocal: true },
-                "十三不塔": { han: 13, isMenzenOnly: true, isLocal: true, isYakuman: true },
-                "燕返し": { han: 1, isLocal: true },
-                "石の上にも三年": { han: 13, isLocal: true, isYakuman: true },
-            };
-            const YAKU_LIST = Object.keys(YAKU_DATA);
+            // --- 統計計算 ---
+            const playerStats = computed(() => {
+                const stats = {};
+                games.value.forEach(g => {
+                    // 順位判定
+                    const ranked = g.p.map((p,i) => ({name:p, s:g.s[i]})).sort((a,b) => b.s - a.s);
+                    
+                    g.p.forEach((name, idx) => {
+                        if (!stats[name]) stats[name] = { 
+                            name, games:0, totalScore:0, 
+                            winCount:0, loseCount:0, 
+                            totalHands:0, handSum:0, loseSum:0, 
+                            maxHand: 0, maxLose: 0,
+                            ranks: [], yakuMap:{} 
+                        };
+                        const s = stats[name];
+                        s.games++;
+                        s.totalScore += g.s[idx];
+                        s.ranks.push(ranked.findIndex(r => r.name === name) + 1);
+                    });
 
-            // 点数計算関数（翻数・符から点数を算出）
-            const calculateHandPoints = (han, fu, isDealer, isTsumo) => {
-                if (han < 1) return 0;
+                    if (g.l) g.l.forEach(log => {
+                        const w = g.p[log.w];
+                        if (stats[w]) {
+                            stats[w].winCount++; 
+                            stats[w].handSum += log.sc; 
+                            stats[w].totalHands++;
+                            if(log.sc > stats[w].maxHand) stats[w].maxHand = log.sc;
+                            log.y?.forEach(yid => {
+                                const yn = YAKU_MASTER.find(y => y.id === yid)?.name || '他';
+                                stats[w].yakuMap[yn] = (stats[w].yakuMap[yn] || 0) + 1;
+                            });
+                        }
+                        if (log.ls !== null && log.ls !== undefined) {
+                            const l = g.p[log.ls];
+                            if (stats[l]) { 
+                                stats[l].loseCount++; 
+                                stats[l].loseSum += log.sc;
+                                if(log.sc > stats[l].maxLose) stats[l].maxLose = log.sc;
+                            }
+                        }
+                    });
+                });
+                
+                return Object.values(stats).sort((a,b) => b.totalScore - a.totalScore).map(s => ({
+                    ...s,
+                    winRate: s.games ? ((s.winCount / (s.games * 10)) * 100).toFixed(1) : 0, // 簡易計算: 1半荘平均10局とする
+                    loseRate: s.games ? ((s.loseCount / (s.games * 10)) * 100).toFixed(1) : 0,
+                    avgHand: s.totalHands ? Math.round(s.handSum / s.totalHands) : 0,
+                    avgLoseScore: s.loseCount ? Math.round(s.loseSum / s.loseCount) : 0,
+                    avgScorePerGame: s.games ? (s.totalScore / s.games).toFixed(1) : 0,
+                    avgRank: s.games ? (s.ranks.reduce((a,b)=>a+b,0) / s.games).toFixed(2) : 0,
+                    totalScore: parseFloat(s.totalScore.toFixed(1)),
+                    yakuMapSorted: Object.fromEntries(Object.entries(s.yakuMap).sort(([,a],[,b]) => b-a))
+                }));
+            });
 
-                // 役満以上
-                if (han >= 13) {
-                    const yakumanCount = Math.floor(han / 13);
-                    const basePoints = 32000 * yakumanCount;
-                    return isDealer ? Math.ceil(basePoints * 1.5) : basePoints;
-                }
+            const globalStats = computed(() => {
+                const s = playerStats.value;
+                if (!s.length) return { avgRank:0, avgWinRate: 0, avgLoseRate: 0, avgScore: 0 };
+                return {
+                    avgRank: (s.reduce((acc, p) => acc + parseFloat(p.avgRank), 0) / s.length).toFixed(2),
+                    avgWinRate: (s.reduce((acc, p) => acc + parseFloat(p.winRate), 0) / s.length).toFixed(1),
+                    avgLoseRate: (s.reduce((acc, p) => acc + parseFloat(p.loseRate), 0) / s.length).toFixed(1),
+                    avgScore: Math.round(s.reduce((acc, p) => acc + p.avgHand, 0) / s.length)
+                };
+            });
 
-                // 満貫以上の固定点数
+            // --- 点数計算ロジック ---
+            const calculatedResult = computed(() => {
+                const { selectedYaku, isMenzen, fu, honba, isWinnerDealer, loserIdx } = handForm.value;
+                const isTsumo = loserIdx === null;
+                const conf = roomConfig.value;
+
+                let han = 0, yakumanCount = 0;
+                
+                // 役集計
+                selectedYaku.forEach(id => {
+                    const y = YAKU_MASTER.find(x => x.id === id);
+                    if (!y) return;
+                    if (y.yakuman) {
+                        // ダブル役満チェック
+                        if (y.double && conf.doubleYakuman) yakumanCount += 2;
+                        else yakumanCount += 1;
+                    } else {
+                        han += (isMenzen ? y.m : y.f);
+                    }
+                });
+
+                // ドラ等は入力欄がないので、とりあえずUIにはないがロジック上は本来必要。
+                // ここでは「役のみ」の翻数計算だが、実用上は翻数手入力もあった方が良いが
+                // UI複雑化を避けるため、役の翻数合計 + 符計算を行う。
+                
                 let basePoints = 0;
-                if (han >= 11) basePoints = 24000; // 三倍満
-                else if (han >= 8) basePoints = 16000; // 倍満
-                else if (han >= 6) basePoints = 12000; // 跳満
-                else if (han >= 5) basePoints = 8000; // 満貫
-                else if (han >= 4 && fu >= 40) basePoints = 8000; // 満貫
-                else if (han >= 3 && fu >= 70) basePoints = 8000; // 満貫
-                else {
-                    // 通常計算
-                    const basicPoints = fu * Math.pow(2, han + 2);
-                    basePoints = Math.min(basicPoints * 4, 8000);
+                let text = "";
+
+                if (yakumanCount > 0) {
+                    // 役満
+                    basePoints = 8000 * yakumanCount;
+                    text = yakumanCount > 1 ? `${yakumanCount}倍役満` : "役満";
+                } else {
+                    if (han === 0) return { score: "役なし", text: "役を選択してください" };
+                    
+                    // 基本点計算: 符 * 2^(2+翻)
+                    let basic = fu * Math.pow(2, 2 + han);
+                    
+                    // 切り上げ満貫: 30符4翻(1920->2000), 60符3翻(1920->2000)
+                    if (conf.kiriage) {
+                        if ((han === 4 && fu === 30) || (han === 3 && fu === 60)) basic = 2000;
+                    }
+
+                    if (basic >= 2000) {
+                        if (han >= 13) { basePoints = 8000; text = "数え役満"; }
+                        else if (han >= 11) { basePoints = 6000; text = "三倍満"; }
+                        else if (han >= 8) { basePoints = 4000; text = "倍満"; }
+                        else if (han >= 6) { basePoints = 3000; text = "跳満"; }
+                        else { basePoints = 2000; text = "満貫"; }
+                    } else {
+                        basePoints = basic;
+                        text = `${han}翻 ${fu}符`;
+                    }
                 }
 
-                if (isDealer) {
-                    return isTsumo
-                        ? Math.ceil((basePoints * 1.5) / 100) * 100
-                        : Math.ceil((basePoints * 1.5) / 100) * 100;
+                // 支払い計算
+                let pay = 0;
+                const honbaPt = honba * 300; // 1本場300点
+
+                if (isTsumo) {
+                    // ツモ
+                    if (isWinnerDealer) {
+                        // 親ツモ: All 2*base
+                        let unit = Math.ceil((basePoints * 2) / 100) * 100;
+                        pay = (unit * 3) + honbaPt;
+                        text += ` (親ツモ ${unit}オール)`;
+                    } else {
+                        // 子ツモ: 子 base, 親 2*base
+                        let ko = Math.ceil(basePoints / 100) * 100;
+                        let oya = Math.ceil((basePoints * 2) / 100) * 100;
+                        pay = (ko * 2 + oya) + honbaPt;
+                        text += ` (子ツモ ${ko}/${oya})`;
+                    }
                 } else {
-                    return Math.ceil(basePoints / 100) * 100;
+                    // ロン
+                    if (isWinnerDealer) {
+                        // 親ロン: 6*base
+                        let pt = Math.ceil((basePoints * 6) / 100) * 100;
+                        pay = pt + honbaPt;
+                    } else {
+                        // 子ロン: 4*base
+                        let pt = Math.ceil((basePoints * 4) / 100) * 100;
+                        pay = pt + honbaPt;
+                    }
+                }
+                
+                return { score: pay + "点", raw: pay, text };
+            });
+
+            // --- アクション ---
+            const joinRoom = async (mode) => {
+                try {
+                    await signInAnonymously(auth);
+                    const roomName = loginForm.value.room;
+                    if (!roomName) return;
+                    
+                    const rRef = doc(db, "rooms", roomName);
+                    if (mode === 'create') {
+                        await setDoc(rRef, { h: CryptoJS.SHA256(loginForm.value.pass).toString(), config: roomConfig.value });
+                    }
+                    // Configロード
+                    const rDoc = await getDoc(rRef);
+                    if(rDoc.exists() && rDoc.data().config) {
+                        roomConfig.value = { ...roomConfig.value, ...rDoc.data().config };
+                    }
+
+                    currentRoomId.value = roomName;
+                    const snap = await getDocs(query(collection(db, "rooms", roomName, "g"), orderBy("d", "desc"), limit(50)));
+                    games.value = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                } catch (e) {
+                    console.error(e);
+                    alert("エラーが発生しました: " + e.message);
                 }
             };
 
-            if (isPreview) {
-                return (
-                    <div className="p-4 space-y-6 max-w-xl mx-auto">
-                        <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={() => setIsPreview(false)}><PlusCircle className="rotate-45" size={18} /> 戻る</Button><h2 className="text-xl font-bold">保存前プレビュー</h2></div>
-                        <Card className="space-y-4">
-                            <div className="text-sm text-gray-500 font-bold border-b pb-2">ポイント計算結果</div>
-                            <div className="space-y-3">
-                                {selected.map((pid, i) => (
-                                    <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
-                                        <div>
-                                            <div className="text-xs font-bold text-gray-400">{players.find(p => p.id === pid)?.name}</div>
-                                            <div className="text-lg font-black">{parseInt(scores[i]).toLocaleString()}</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className={`text-xl font-black ${result.points[i] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{result.points[i] > 0 ? `+${result.points[i]}` : result.points[i]}</div>
-                                            <Badge>{result.ranks[i]}位</Badge>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                        <Button className="w-full h-14 text-lg" onClick={() => {
-                            const ts = new Date(`${date}T${startTime}`).getTime();
-                            const matchData = { groupId: currentGroupId, players: selected, scores: scores.map(s => parseInt(s)), points: result.points, ranks: result.ranks, timestamp: ts, startTime, endTime, memo, hands };
-                            if (viewParams.editId) editMatch(viewParams.editId, matchData);
-                            else addMatch(matchData);
-                            navigate('dashboard');
-                        }}>確定して保存する</Button>
-                    </div>
-                );
-            }
+            const saveGame = async () => {
+                if(!confirm("結果を保存しますか？")) return;
+                const uma = roomConfig.value.uma.split('-').map(Number);
+                // ウマのフォーマット調整 (10-30 or 30-10--10--30)
+                let u = [0,0,0,0];
+                if(uma.length === 2) { u[0]=uma[1]; u[1]=uma[0]; u[2]=-uma[0]; u[3]=-uma[1]; }
+                else if(uma.length === 4) { u = uma; }
 
-            return (
-                <div className="p-4 space-y-4 max-w-xl mx-auto pb-32">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-black">{viewParams.editId ? '対局編集' : '対局記録'}</h2>
-                        <div className="flex flex-col items-end">
-                            <Badge variant={sum === targetScore ? "success" : "warning"}>{sum.toLocaleString()} / {targetScore.toLocaleString()}</Badge>
-                            {sum !== targetScore && <span className="text-[10px] text-red-500 mt-1 font-bold">点数が矛盾しています ({sum - targetScore > 0 ? `+${sum - targetScore}` : sum - targetScore})</span>}
-                        </div>
-                    </div>
+                const ranked = inputForm.value.rawScores.map((s, i) => ({ s, i })).sort((a,b) => b.s - a.s);
+                const finalS = new Array(4).fill(0);
+                
+                // トップ賞(オカ)の処理
+                const kaeshi = roomConfig.value.kaeshi;
+                const okaTotal = (kaeshi - 25000) * 4; // 普通は (30000-25000)*4 = 20000点 = 20pt
 
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-1 gap-2">
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-gray-400">対局日</span>
-                                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-gray-400">開始時刻</span>
-                                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} />
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-[10px] font-bold text-gray-400">終了時刻</span>
-                                <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-gray-400">メモ</span>
-                            <Input value={memo} onChange={e => setMemo(e.target.value)} placeholder="メモを入力..." />
-                        </div>
-                    </div>
-
-                    <div className="space-y-4 pt-2">
-                        {selected.map((s, i) => (
-                            <Card key={i} className="relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-1"><Badge>{i + 1}</Badge></div>
-                                <div className="space-y-3">
-                                    <div className="flex gap-2">
-                                        <select className="flex-1 h-10 px-3 border rounded-lg text-sm bg-white" value={s} onChange={e => { const n = [...selected]; n[i] = e.target.value; setSelected(n); }}>
-                                            <option value="">プレイヤーを選択</option>
-                                            {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                        </select>
-                                        <Button variant="outline" size="sm" onClick={() => setIsAddingPlayer(true)}><UserPlus size={16} /></Button>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex-1">
-                                            <span className="text-[10px] font-bold text-gray-400 ml-1">最終素点</span>
-                                            <Input type="number" className="font-black text-xl h-12" value={scores[i]} onChange={e => { const n = [...scores]; n[i] = e.target.value; setScores(n); }} />
-                                        </div>
-                                        {result && (
-                                            <div className="text-right min-w-[70px] pt-4">
-                                                <div className={`text-lg font-black ${result.points[i] >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{result.points[i] > 0 ? `+${result.points[i]}` : result.points[i]}</div>
-                                                <div className="text-[10px] text-gray-400 font-bold">{result.ranks[i]}位</div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </Card>
-                        ))}
-                    </div>
-
-                    <section className="space-y-3 pt-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-bold text-sm flex items-center gap-2"><Trophy size={16} />和了記録 (任意)</h3>
-                            <Button variant="outline" size="sm" className="text-[10px] h-7" onClick={addHand}><Plus size={14} className="mr-1" />和了を追加</Button>
-                        </div>
-                        {hands.length === 0 && <div className="text-center py-8 border-2 border-dashed rounded-xl text-gray-300 text-xs font-bold">和了の記録がありません</div>}
-                        <div className="space-y-3">
-                            {hands.map((h, i) => {
-                                // 選択された役から翻数を自動計算（食い下がり考慮）
-                                const autoHan = h.yaku.reduce((sum, yakuName) => {
-                                    const yakuInfo = YAKU_DATA[yakuName];
-                                    if (!yakuInfo) return sum;
-                                    // 門前限定役で鳴いている場合は0
-                                    if (yakuInfo.isMenzenOnly && h.isOpen) return sum;
-                                    // 食い下がり適用
-                                    const reduction = (h.isOpen && yakuInfo.openHanReduction) ? yakuInfo.openHanReduction : 0;
-                                    return sum + Math.max(yakuInfo.han - reduction, 0);
-                                }, 0);
-                                // 点数自動計算
-                                const calculatedPoints = calculateHandPoints(
-                                    parseInt(h.han) || autoHan,
-                                    parseInt(h.fu) || 30,
-                                    h.isDealer || false,
-                                    h.type === 'tsumo'
-                                );
-
-                                return (
-                                    <Card key={i} className="p-3 bg-gray-50/50 border-emerald-100">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-[10px] font-bold text-emerald-600">記録 #{i + 1}</span>
-                                            <button className="text-red-400 text-[10px]" onClick={() => setHands(hands.filter((_, idx) => idx !== i))}>削除</button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 mb-2">
-                                            <select className="h-8 text-xs border rounded px-2" value={h.winner} onChange={e => updateHand(i, 'winner', e.target.value)}>
-                                                <option value="">和了者を選択</option>
-                                                {selected.filter(id => !!id).map(id => <option key={id} value={id}>{players.find(p => p.id === id)?.name}</option>)}
-                                            </select>
-                                            <select className="h-8 text-xs border rounded px-2" value={h.type} onChange={e => updateHand(i, 'type', e.target.value)}>
-                                                <option value="ron">ロン和了</option>
-                                                <option value="tsumo">ツモ和了</option>
-                                            </select>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2 mb-2">
-                                            {h.type === 'ron' && (
-                                                <select className="h-8 text-xs border rounded px-2" value={h.loser} onChange={e => updateHand(i, 'loser', e.target.value)}>
-                                                    <option value="">放銃者を選択</option>
-                                                    {selected.filter(id => !!id && id !== h.winner).map(id => <option key={id} value={id}>{players.find(p => p.id === id)?.name}</option>)}
-                                                </select>
-                                            )}
-                                            <div className="flex items-center gap-3">
-                                                <label className="flex items-center gap-1 text-[10px]">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={h.isDealer || false}
-                                                        onChange={e => updateHand(i, 'isDealer', e.target.checked)}
-                                                        className="w-3 h-3"
-                                                    />
-                                                    <span className="font-bold text-amber-600">親</span>
-                                                </label>
-                                                <label className="flex items-center gap-1 text-[10px]">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={h.isOpen || false}
-                                                        onChange={e => updateHand(i, 'isOpen', e.target.checked)}
-                                                        className="w-3 h-3"
-                                                    />
-                                                    <span className="font-bold text-orange-500">副露(鳴)</span>
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        {/* 場・局・本場 */}
-                                        <div className="grid grid-cols-3 gap-2 mb-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-slate-500 block">場</label>
-                                                <select
-                                                    className="w-full h-7 text-xs border rounded px-1"
-                                                    value={h.ba || '東'}
-                                                    onChange={e => updateHand(i, 'ba', e.target.value)}
-                                                >
-                                                    <option value="東">東場</option>
-                                                    <option value="南">南場</option>
-                                                    <option value="西">西場</option>
-                                                    <option value="北">北場</option>
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-slate-500 block">局</label>
-                                                <select
-                                                    className="w-full h-7 text-xs border rounded px-1"
-                                                    value={h.kyoku || 1}
-                                                    onChange={e => updateHand(i, 'kyoku', parseInt(e.target.value))}
-                                                >
-                                                    {[1, 2, 3, 4].map(k => (
-                                                        <option key={k} value={k}>{k}局</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-slate-500 block">本場</label>
-                                                <Input
-                                                    type="number"
-                                                    className="h-7 text-xs text-center"
-                                                    value={h.honba || 0}
-                                                    min={0}
-                                                    onChange={e => updateHand(i, 'honba', parseInt(e.target.value) || 0)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* 翻数・符数・点数入力（ラベル明確化） */}
-                                        <div className="grid grid-cols-3 gap-2 mb-3 bg-white p-2 rounded-lg border">
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-blue-600 block">翻数 (飜)</label>
-                                                <Input
-                                                    type="number"
-                                                    className="h-8 text-xs text-center font-bold"
-                                                    value={h.han || autoHan}
-                                                    onChange={e => updateHand(i, 'han', e.target.value)}
-                                                    placeholder={String(autoHan)}
-                                                />
-                                                {autoHan > 0 && <div className="text-[8px] text-blue-400">自動計算: {autoHan}翻</div>}
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-purple-600 block">符数 (符)</label>
-                                                <select
-                                                    className="w-full h-8 text-xs border rounded px-1 font-bold text-center"
-                                                    value={h.fu || 30}
-                                                    onChange={e => updateHand(i, 'fu', e.target.value)}
-                                                >
-                                                    {[20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110].map(f => (
-                                                        <option key={f} value={f}>{f}符</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[9px] font-bold text-emerald-600 block">点数 (点)</label>
-                                                <Input
-                                                    type="number"
-                                                    className="h-8 text-xs text-center font-bold"
-                                                    value={h.points || calculatedPoints}
-                                                    onChange={e => updateHand(i, 'points', e.target.value)}
-                                                    placeholder={String(calculatedPoints)}
-                                                />
-                                                {calculatedPoints > 0 && <div className="text-[8px] text-emerald-400">計算値: {calculatedPoints.toLocaleString()}</div>}
-                                            </div>
-                                        </div>
-
-                                        {/* 役選択（ローカル役とその他を分類） */}
-                                        <div className="space-y-2">
-                                            <div className="text-[9px] font-bold text-gray-500 border-b pb-1">通常役（選択すると翻数が自動計算されます）</div>
-                                            <div className="flex flex-wrap gap-1">
-                                                {YAKU_LIST.filter(y => !YAKU_DATA[y]?.isLocal).map(y => (
-                                                    <button
-                                                        key={y}
-                                                        className={`px-1.5 py-0.5 rounded-[4px] text-[7px] font-bold border transition-colors ${h.yaku.includes(y) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-400 border-gray-200 hover:border-emerald-300'}`}
-                                                        onClick={() => {
-                                                            const newYaku = h.yaku.includes(y) ? h.yaku.filter(v => v !== y) : [...h.yaku, y];
-                                                            updateHand(i, 'yaku', newYaku);
-                                                            // 翻数を自動更新
-                                                            const newAutoHan = newYaku.reduce((sum, yakuName) => {
-                                                                const yakuInfo = YAKU_DATA[yakuName];
-                                                                return sum + (yakuInfo ? yakuInfo.han : 0);
-                                                            }, 0);
-                                                            if (newAutoHan > 0) {
-                                                                updateHand(i, 'han', newAutoHan);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {y}
-                                                        <span className="ml-0.5 opacity-60">({YAKU_DATA[y]?.han || '?'}翻)</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="text-[9px] font-bold text-orange-500 border-b pb-1 mt-2">ローカル役</div>
-                                            <div className="flex flex-wrap gap-1">
-                                                {YAKU_LIST.filter(y => YAKU_DATA[y]?.isLocal).map(y => (
-                                                    <button
-                                                        key={y}
-                                                        className={`px-1.5 py-0.5 rounded-[4px] text-[7px] font-bold border transition-colors ${h.yaku.includes(y) ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-orange-400 border-orange-200 hover:border-orange-300'}`}
-                                                        onClick={() => {
-                                                            const newYaku = h.yaku.includes(y) ? h.yaku.filter(v => v !== y) : [...h.yaku, y];
-                                                            updateHand(i, 'yaku', newYaku);
-                                                            const newAutoHan = newYaku.reduce((sum, yakuName) => {
-                                                                const yakuInfo = YAKU_DATA[yakuName];
-                                                                return sum + (yakuInfo ? yakuInfo.han : 0);
-                                                            }, 0);
-                                                            if (newAutoHan > 0) {
-                                                                updateHand(i, 'han', newAutoHan);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {y}
-                                                        <span className="ml-0.5 opacity-60">({YAKU_DATA[y]?.han || '?'}翻)</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    </section>
-
-                    {isAddingPlayer && (
-                        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-6 z-[100] backdrop-blur-sm">
-                            <Card className="w-full max-w-sm space-y-4 bg-white shadow-2xl p-6">
-                                <h3 className="font-bold">プレイヤー追加</h3>
-                                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="名前を入力..." autoFocus />
-                                <div className="flex gap-2">
-                                    <Button variant="secondary" className="flex-1" onClick={() => setIsAddingPlayer(false)}>戻る</Button>
-                                    <Button className="flex-1" onClick={() => { if (newName) addPlayer(newName); setNewName(''); setIsAddingPlayer(false); }}>追加</Button>
-                                </div>
-                            </Card>
-                        </div>
-                    )}
-
-                    <div className="fixed bottom-20 left-4 right-4 max-w-xl mx-auto flex gap-2">
-                        <Button variant="secondary" className="flex-1 h-14" onClick={() => navigate('dashboard')}>戻る</Button>
-                        <Button className="flex-[2] h-14" disabled={!isValid} onClick={() => setIsPreview(true)} size="lg">内容を確認する</Button>
-                    </div>
-                </div>
-            );
-        };
-
-        const HistoryView = () => {
-            const { currentGroupId, getGroupMatches, players: allPlayers, deleteMatch, navigate } = useStore();
-            const matches = getGroupMatches(currentGroupId).sort((a, b) => b.timestamp - a.timestamp);
-            const [filterPlayer, setFilterPlayer] = useState('');
-            const [sortOrder, setSortOrder] = useState('desc');
-
-            const filteredMatches = useMemo(() => {
-                let m = matches;
-                if (filterPlayer) m = m.filter(match => match.players.includes(filterPlayer));
-                return sortOrder === 'asc' ? [...m].reverse() : m;
-            }, [matches, filterPlayer, sortOrder]);
-
-            return (
-                <div className="p-4 space-y-4 max-w-2xl mx-auto pb-32">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-black">対局履歴</h2>
-                        <span className="text-xs font-bold text-gray-400">{filteredMatches.length} 件</span>
-                    </div>
-
-                    <Card className="p-2 flex gap-2 overflow-x-auto no-scrollbar">
-                        <select className="text-xs border rounded p-1" value={filterPlayer} onChange={e => setFilterPlayer(e.target.value)}>
-                            <option value="">全プレイヤー</option>
-                            {Object.values(allPlayers).filter(p => p.groupId === currentGroupId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                        <select className="text-xs border rounded p-1" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-                            <option value="desc">新しい順</option>
-                            <option value="asc">古い順</option>
-                        </select>
-                    </Card>
-
-                    <div className="space-y-3">
-                        {filteredMatches.map(m => (
-                            <Card key={m.id} className="p-3 border-l-4 border-emerald-500 relative group text-xs">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="text-[10px] text-gray-400 font-bold">{new Date(m.timestamp).toLocaleString()}</div>
-                                    <div className="flex gap-2">
-                                        <button className="text-[10px] text-emerald-500 underline" onClick={() => navigate('newMatch', { editId: m.id })}>編集</button>
-                                        <button className="text-[10px] text-red-500 underline" onClick={() => { if (confirm("削除しますか？")) deleteMatch(m.id); }}>削除</button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {m.points.map((pt, i) => (
-                                        <div key={i} className="text-center">
-                                            <div className="text-[9px] text-gray-500 truncate font-bold">{allPlayers[m.players[i]]?.name || '---'}</div>
-                                            <div className={`text-sm font-black ${pt >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{pt > 0 ? `+${pt}` : pt}</div>
-                                            <div className="text-[8px] text-gray-300">{parseInt(m.scores[i]).toLocaleString()}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                                {m.hands && m.hands.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t flex flex-wrap gap-1">
-                                        {m.hands.map((h, hi) => (
-                                            <Badge key={hi} variant="secondary" className="text-[7px] py-0 px-1">{allPlayers[h.winner]?.name.slice(0, 2)}: {h.yaku?.[0] || '和了'}</Badge>
-                                        ))}
-                                    </div>
-                                )}
-                                {m.memo && <div className="mt-1 text-[8px] text-gray-400 bg-gray-50 p-1 rounded italic flex items-center gap-1"><Icons.FileText size={10} /> "{m.memo}"</div>}
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            );
-        };
-
-        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip: ChartTooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } = Recharts || {};
-        const AnalyticsView = () => {
-            const { currentGroupId, getGroupPlayers, getGroupMatches, players: allPlayers, groups } = useStore();
-            const group = groups[currentGroupId];
-            const players = getGroupPlayers(currentGroupId);
-            const chronMatches = getGroupMatches(currentGroupId).sort((a, b) => a.timestamp - b.timestamp);
-
-            const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-            const [range, setRange] = useState('all');
-            const [metric, setMetric] = useState('points');
-            const [period, setPeriod] = useState('all');
-
-            // グループがない場合のガード
-            if (!group) return (
-                <div className="p-4 text-center">
-                    <p className="text-gray-500">グループが見つかりません</p>
-                </div>
-            );
-
-            const filteredChronMatches = useMemo(() => {
-                const now = new Date();
-                return chronMatches.filter(m => {
-                    const d = new Date(m.timestamp);
-                    if (period === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                    if (period === 'year') return d.getFullYear() === now.getFullYear();
-                    return true;
+                ranked.forEach((r, rank) => {
+                    // 素点計算: (持ち点 - 30000) / 1000  <- 一般的なMリーグ等は30000返し
+                    let pt = (r.s - kaeshi) / 1000; 
+                    
+                    // ウマ・オカ加算
+                    if (rank===0) pt += ((roomConfig.value.oka || 0) + u[0]); 
+                    else pt += u[rank];
+                    
+                    finalS[r.i] = Math.round(pt*10)/10;
                 });
-            }, [chronMatches, period]);
+                
+                // 合計0チェック（五捨六入等によるズレ補正はトップにしわ寄せ）
+                const sum = finalS.reduce((a,b)=>a+b,0);
+                if(Math.abs(sum) > 0.1) {
+                    const topIdx = ranked[0].i;
+                    finalS[topIdx] = parseFloat((finalS[topIdx] - sum).toFixed(1));
+                }
 
-            const stats = useMemo(() => {
-                const s = {};
-                players.forEach(p => s[p.id] = {
-                    id: p.id, name: p.name,
-                    totalPoints: 0, totalScore: 0,
-                    ranks: [], history: [{ m: 0, val: 0 }],
-                    hands: 0, highestPoints: 0, highestHand: null,
-                    count: 0, yaku: {}, rankDist: { 1: 0, 2: 0, 3: 0, 4: 0 }
+                const data = { 
+                    d:Date.now(), 
+                    p:inputForm.value.players, 
+                    s:finalS, 
+                    l:inputForm.value.logs, 
+                    config: roomConfig.value 
+                };
+                
+                await addDoc(collection(db, "rooms", currentRoomId.value, "g"), data);
+                games.value.unshift(data);
+                
+                // Reset Log but keep players
+                inputForm.value.logs = [];
+                inputForm.value.rawScores = [25000,25000,25000,25000];
+                tab.value = 'dashboard';
+            };
+
+            const addHandLog = () => {
+                const res = calculatedResult.value;
+                if(typeof res.raw !== 'number') return;
+                
+                const { winnerIdx, loserIdx, ba, kyoku, honba } = handForm.value;
+                const baName = ['東','南','西'][ba];
+                const roundName = `${baName}${kyoku}局 ${honba}本場`;
+                
+                const log = {
+                    roundName,
+                    w: winnerIdx,
+                    ls: loserIdx,
+                    winner: inputForm.value.players[winnerIdx],
+                    loser: loserIdx !== null ? inputForm.value.players[loserIdx] : null,
+                    score: res.raw,
+                    sc: res.raw, // score value
+                    y: handForm.value.selectedYaku
+                };
+                
+                inputForm.value.logs.push(log);
+                showHandModal.value = false;
+            };
+
+            const openHandModal = () => {
+                // 自動で局を進める簡易ロジック
+                if (inputForm.value.logs.length > 0) {
+                    const last = inputForm.value.logs[inputForm.value.logs.length - 1];
+                    // ここで前回の局情報をパースして次にするなどの処理が可能だが、今回は単純に前回値を保持するだけに留めるか、初期化
+                }
+                handForm.value.selectedYaku = [];
+                showHandModal.value = true;
+            };
+
+            const toggleYaku = (y) => {
+                const i = handForm.value.selectedYaku.indexOf(y.id);
+                if (i > -1) handForm.value.selectedYaku.splice(i,1); 
+                else {
+                    // 七対子は他と複合しにくい等の制御を入れると親切だが、今回は単純トグル
+                    handForm.value.selectedYaku.push(y.id);
+                    if(y.fixedFu) handForm.value.fu = y.fixedFu;
+                }
+            };
+            
+            // --- Helper / Watchers ---
+            const filteredYaku = computed(() => YAKU_MASTER.filter(y => !y.local || roomConfig.value.localYaku));
+            const canSelectYaku = (y) => handForm.value.isMenzen ? true : (y.f > 0 || y.yakuman);
+
+            const renderLineChart = () => {
+                const ctx = document.getElementById('scoreChart');
+                if (!ctx) return;
+                if (lineChart) lineChart.destroy();
+                const filtered = chartMode.value === 'top4' ? playerStats.value.slice(0, 4) : playerStats.value;
+                lineChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: games.value.map((_, i) => i + 1).reverse(),
+                        datasets: filtered.map((p, i) => ({
+                            label: p.name,
+                            data: games.value.slice().reverse().reduce((acc, g) => {
+                                const idx = g.p.indexOf(p.name);
+                                const last = acc.length ? acc[acc.length-1] : 0;
+                                acc.push(idx > -1 ? last + g.s[idx] : last);
+                                return acc;
+                            }, []),
+                            borderColor: ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6', '#6366f1'][i % 6],
+                            tension: 0.3
+                        }))
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false } }
                 });
+            };
 
-                filteredChronMatches.forEach((m, i) => {
-                    m.players.forEach((pid, pidx) => {
-                        if (s[pid]) {
-                            const point = m.points?.[pidx] ?? 0;
-                            const score = m.scores?.[pidx] ?? 0;
-                            const rank = m.ranks?.[pidx];
-
-                            s[pid].totalPoints += point;
-                            s[pid].totalScore += score;
-                            if (rank) {
-                                s[pid].ranks.push(rank);
-                                s[pid].rankDist[rank] = (s[pid].rankDist[rank] || 0) + 1;
-                            }
-                            s[pid].count++;
-
-                            let val = 0;
-                            if (metric === 'points') val = parseFloat(s[pid].totalPoints.toFixed(1));
-                            else if (metric === 'rank') val = parseFloat((s[pid].ranks.reduce((a, b) => a + b, 0) / s[pid].ranks.length).toFixed(2));
-                            else val = s[pid].totalScore;
-
-                            s[pid].history.push({ m: i + 1, val });
-                        }
-                    });
-                    if (m.hands) {
-                        m.hands.forEach(h => {
-                            if (s[h.winner]) {
-                                s[h.winner].hands++;
-                                if (parseInt(h.points) > s[h.winner].highestPoints) {
-                                    s[h.winner].highestPoints = parseInt(h.points);
-                                    s[h.winner].highestHand = { yaku: h.yaku, points: h.points, date: m.timestamp };
-                                }
-                                if (h.yaku) h.yaku.forEach(y => { s[h.winner].yaku[y] = (s[h.winner].yaku[y] || 0) + 1; });
-                            }
-                        });
-                    }
+            const renderPieChart = (p) => {
+                const ctx = document.getElementById('yakuPieChart');
+                if (!ctx || pieChart) pieChart?.destroy();
+                pieChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(p.yakuMapSorted).slice(0, 5),
+                        datasets: [{ data: Object.values(p.yakuMapSorted).slice(0, 5), backgroundColor: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
                 });
+            };
 
-                return Object.values(s).sort((a, b) => b.totalPoints - a.totalPoints);
-            }, [players, filteredChronMatches, metric]);
-
-            const chartData = useMemo(() => {
-                let targetMatches = filteredChronMatches;
-                if (range !== 'all') targetMatches = filteredChronMatches.slice(-parseInt(range));
-
-                return Array.from({ length: targetMatches.length + 1 }, (_, i) => {
-                    const row = { name: `${i}戦` };
-                    stats.forEach(p => {
-                        const matchIdxInFiltered = filteredChronMatches.length - targetMatches.length + i;
-                        const entry = p.history[matchIdxInFiltered] || { val: 0 };
-                        row[p.name] = entry.val;
-                    });
-                    return row;
-                });
-            }, [stats, filteredChronMatches, range]);
-
-            // プレイヤー選択画面
-            if (!selectedPlayerId) {
-                return (
-                    <div className="p-6 max-w-md mx-auto space-y-6 pb-24">
-                        <h2 className="text-2xl font-black">分析</h2>
-                        <Card className="p-4 bg-emerald-50 border-emerald-100">
-                            <div className="flex gap-2">
-                                <Icons.Info size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                                <p className="text-xs text-emerald-800 font-bold">詳細はプレイヤーを選択してください</p>
-                            </div>
-                        </Card>
-                        <div className="grid gap-3">
-                            {players.map(p => (
-                                <Card key={p.id} className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 active:scale-95 transition-all" onClick={() => setSelectedPlayerId(p.id)}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-black">
-                                            {p.name.slice(0, 2)}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-lg">{p.name}</div>
-                                            <div className="text-[10px] text-gray-400 font-bold">通算 {stats.find(s => s.id === p.id)?.count || 0} 戦</div>
-                                        </div>
-                                    </div>
-                                    <Icons.ChevronRight size={20} className="text-gray-300" />
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
-
-            // 個別詳細画面
-            const targetStat = stats.find(s => s.id === selectedPlayerId);
-            if (!targetStat) return <div className="p-4">プレイヤーデータが見つかりません <Button onClick={() => setSelectedPlayerId(null)}>戻る</Button></div>;
-
-            const yakuRanking = Object.entries(targetStat.yaku).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            const yakuPieData = yakuRanking.map(([name, count], i) => ({
-                name,
-                value: count,
-                color: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'][i % 10]
-            }));
-
-            return (
-                <div className="p-4 space-y-6 max-w-4xl mx-auto pb-32">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedPlayerId(null)}>
-                            <Icons.ChevronLeft size={16} /> 一覧へ
-                        </Button>
-                        <h2 className="text-xl font-black">{targetStat.name}の分析</h2>
-                    </div>
-
-                    <div className="flex justify-end gap-2 mb-2">
-                        <select className="text-[10px] border rounded font-bold px-1" value={period} onChange={e => setPeriod(e.target.value)}>
-                            <option value="all">全期間</option>
-                            <option value="month">今月</option>
-                            <option value="year">今年</option>
-                        </select>
-                        <select className="text-[10px] border rounded font-bold px-1" value={metric} onChange={e => setMetric(e.target.value)}>
-                            <option value="points">収支</option>
-                            <option value="rank">平均順位</option>
-                        </select>
-                        <select className="text-[10px] border rounded font-bold px-1" value={range} onChange={e => setRange(e.target.value)}>
-                            <option value="all">全表示</option>
-                            <option value="10">直近10戦</option>
-                            <option value="5">直近5戦</option>
-                        </select>
-                    </div>
-
-                    <Card className="h-64 p-2 bg-white flex flex-col shadow-sm">
-                        <div className="flex justify-between items-center mb-2 px-1">
-                            <span className="text-[10px] font-bold text-gray-400">{metric === 'points' ? '累積収支推移' : '平均順位推移'}</span>
-                            <div className="flex gap-2 items-center text-[8px] text-gray-400 font-bold">
-                                <Icons.TrendingUp size={10} /> Trend
-                            </div>
-                        </div>
-                        {chartData.length > 1 && stats.length > 0 && ResponsiveContainer && LineChart ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeOpacity={0.05} vertical={false} />
-                                    <XAxis hide dataKey="name" />
-                                    <YAxis fontSize={8} reversed={metric === 'rank'} tickFormatter={v => metric === 'points' && v > 0 ? `+${v}` : v} />
-                                    <ChartTooltip contentStyle={{ fontSize: '10px', borderRadius: '12px', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} />
-                                    <Legend iconType="circle" wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} />
-                                    {/* 選択されたプレイヤーのみ太く表示、他は薄く表示 */}
-                                    {stats.map((p, i) => (
-                                        <Line
-                                            key={p.id}
-                                            type="monotone"
-                                            dataKey={p.name}
-                                            stroke={p.id === selectedPlayerId ? '#10b981' : '#e5e7eb'}
-                                            strokeWidth={p.id === selectedPlayerId ? 3 : 1}
-                                            dot={p.id === selectedPlayerId ? { r: 3 } : false}
-                                            activeDot={{ r: 5 }}
-                                            animationDuration={1000}
-                                            // 他プレイヤーのラインは目立たなくする
-                                            strokeOpacity={p.id === selectedPlayerId ? 1 : 0.3}
-                                            zIndex={p.id === selectedPlayerId ? 10 : 0}
-                                        />
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-gray-300 text-sm font-bold">
-                                対局データがありません
-                            </div>
-                        )}
-                    </Card>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {/* 基本スタッツ */}
-                        <Card className="space-y-4 p-4">
-                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.Activity size={16} /> スタッツ</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="text-xs text-gray-500 mb-1">平均順位</div>
-                                    <div className="text-xl font-black text-emerald-600">{(targetStat.ranks.length ? targetStat.ranks.reduce((a, b) => a + b, 0) / targetStat.ranks.length : 0).toFixed(2)}</div>
-                                </div>
-                                <div className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="text-xs text-gray-500 mb-1">トップ率</div>
-                                    <div className="text-xl font-black text-blue-600">{(targetStat.ranks.filter(r => r === 1).length / (targetStat.count || 1) * 100).toFixed(1)}%</div>
-                                </div>
-                                <div className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="text-xs text-gray-500 mb-1">平均素点</div>
-                                    <div className="text-xl font-black">{Math.round(targetStat.totalScore / (targetStat.count || 1)).toLocaleString()}</div>
-                                </div>
-                                <div className="text-center p-2 bg-gray-50 rounded">
-                                    <div className="text-xs text-gray-500 mb-1">平均収支</div>
-                                    <div className="text-xl font-black">{(targetStat.totalPoints / (targetStat.count || 1)).toFixed(1)}</div>
-                                </div>
-                            </div>
-                        </Card>
-
-                        {/* 最高打点 */}
-                        <Card className="p-4 bg-gradient-to-br from-amber-50 to-amber-100">
-                            <div className="text-[10px] font-bold text-amber-500 mb-2 flex items-center gap-1">
-                                <Icons.Trophy size={12} />最高打点の手
-                            </div>
-                            {targetStat.highestHand ? (
-                                <div className="space-y-1">
-                                    <div className="text-lg font-black text-amber-700">
-                                        {parseInt(targetStat.highestHand.points).toLocaleString()}点
-                                    </div>
-                                    <div className="flex flex-wrap gap-1">
-                                        {(targetStat.highestHand.yaku || []).slice(0, 3).map(y => (
-                                            <span key={y} className="bg-white px-1.5 py-0.5 rounded text-[7px] font-bold text-amber-600 border border-amber-200">{y}</span>
-                                        ))}
-                                        {(targetStat.highestHand.yaku || []).length > 3 && (
-                                            <span className="text-[8px] text-amber-400">+{targetStat.highestHand.yaku.length - 3}</span>
-                                        )}
-                                    </div>
-                                    <div className="text-[8px] text-amber-400">{new Date(targetStat.highestHand.date).toLocaleDateString()}</div>
-                                </div>
-                            ) : (
-                                <div className="text-[10px] text-amber-400">データなし</div>
-                            )}
-                        </Card>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {/* 順位分布 */}
-                        <Card className="p-4 space-y-4">
-                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.BarChart3 size={16} /> 順位分布</h3>
-                            <div className="h-48">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={[{ name: targetStat.name, range1: targetStat.rankDist[1], range2: targetStat.rankDist[2], range3: targetStat.rankDist[3], range4: targetStat.rankDist[4] }]}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" fontSize={8} />
-                                        <YAxis fontSize={8} />
-                                        <ChartTooltip />
-                                        <Bar dataKey="range1" name="1位" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="range2" name="2位" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="range3" name="3位" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="range4" name="4位" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </Card>
-
-                        {/* 役頻度 */}
-                        <Card className="p-4 space-y-4">
-                            <h3 className="text-sm font-bold flex items-center gap-2"><Icons.PieChart size={16} /> 役傾向</h3>
-                            {yakuPieData.length > 0 ? (
-                                <div className="flex items-center">
-                                    <div className="h-32 w-32 shrink-0">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie data={yakuPieData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} paddingAngle={2} dataKey="value">
-                                                    {yakuPieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                                                </Pie>
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="flex-1 pl-4 h-32 overflow-y-auto custom-scrollbar">
-                                        {yakuRanking.map(([name, count], i) => (
-                                            <div key={name} className="flex justify-between items-center text-[10px] mb-1">
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: yakuPieData[i].color }}></div>
-                                                    <span>{name}</span>
-                                                </div>
-                                                <span className="font-bold">{count}回</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center text-gray-400 text-xs py-8">データなし</div>
-                            )}
-                        </Card>
-                    </div>
-                </div>
-            );
-        };
-
-        const SettingsView = () => {
-            const { currentGroupId, groups, updateGroupRules, navigate, leaveGroup } = useStore();
-            const group = groups[currentGroupId];
-
-            if (!group) return null;
-
-            return (
-                <div className="p-4 space-y-6 max-w-2xl mx-auto pb-32">
-                    <h2 className="text-xl font-black">グループ設定</h2>
-
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Settings size={18} className="text-gray-400" />
-                            <h3 className="font-bold text-sm">基本ルール設定</h3>
-                        </div>
-                        <Card className="p-4">
-                            <RuleForm
-                                initialRules={group.rules}
-                                onSubmit={(newRules) => {
-                                    updateGroupRules(currentGroupId, newRules);
-                                    alert("ルールを更新しました");
-                                }}
-                                submitLabel="ルールを保存"
-                            />
-                        </Card>
-                    </section>
-
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Icons.CloudUpload size={18} className="text-emerald-500" />
-                            <h3 className="font-bold text-sm">クラウド移行 (New)</h3>
-                        </div>
-                        <Card className="p-4 border-emerald-100 bg-emerald-50/30">
-                            <div className="space-y-4">
-                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
-                                    現在ブラウザに保存されているデータを、新しいクラウドデータベースへアップロードします。
-                                </p>
-                                <Button className="w-full h-12" onClick={async () => {
-                                    if (!confirm("現在のデータをクラウドへ移行しますか？\n（Next.js版アプリへデータを引き継ぎます）")) return;
-
-                                    try {
-                                        const firebaseConfig = {
-                                            apiKey: "9cd51b93f21a2451d7c29342db55cb18842b76df",
-                                            authDomain: "mahjong@mahjongstorage-836e8.iam.gserviceaccount.com",
-                                            projectId: "mahjongstorage-836e8",
-                                            storageBucket: "your_project_id.appspot.com",
-                                            messagingSenderId: "618604764916",
-                                            appId: "1:618604764916:web:9ca128c3e76a7cb3e248a"
-                                        };
-
-                                        if (!firebase.apps.length) {
-                                            firebase.initializeApp(firebaseConfig);
-                                        }
-                                        const db = firebase.firestore();
-
-                                        const rawData = localStorage.getItem('mahjong-tracker-storage');
-                                        if (!rawData) {
-                                            alert("移行するデータが見つかりません。");
-                                            return;
-                                        }
-                                        const data = JSON.parse(rawData);
-
-                                        // 1. Groups
-                                        const groupPromises = Object.values(data.groups || {}).map(async (group) => {
-                                            await db.collection('groups').doc(group.id).set(group);
-
-                                            // 2. Players for this group
-                                            const groupPlayers = Object.values(data.players || {}).filter(p => p.groupId === group.id);
-                                            for (const player of groupPlayers) {
-                                                await db.collection('groups').doc(group.id).collection('players').doc(player.id).set(player);
-                                            }
-
-                                            // 3. Matches for this group
-                                            const groupMatches = Object.values(data.matches || {}).filter(m => m.groupId === group.id);
-                                            for (const match of groupMatches) {
-                                                await db.collection('groups').doc(group.id).collection('matches').doc(match.id).set(match);
-                                            }
-                                        });
-
-                                        await Promise.all(groupPromises);
-                                        alert("クラウドへの移行が完了しました！\nNext.js版アプリを開いて確認してください。");
-
-                                    } catch (e) {
-                                        console.error(e);
-                                        alert("移行に失敗しました: " + e.message);
-                                    }
-                                }}>今すぐデータを移行する</Button>
-                            </div>
-                        </Card>
-                    </section>
-
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2">
-                            <LogIn size={18} className="text-blue-400 rotate-180" />
-                            <h3 className="font-bold text-sm">グループ管理</h3>
-                        </div>
-                        <Card className="p-4 border-blue-100 bg-blue-50/30">
-                            <div className="space-y-4">
-                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">
-                                    現在のグループから一時的に抜けます。データは保持され、再度参加できます。
-                                </p>
-                                <Button
-                                    variant="outline"
-                                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-50"
-                                    onClick={() => {
-                                        if (confirm("グループから抜けますか？")) {
-                                            leaveGroup();
-                                        }
-                                    }}
-                                >
-                                    グループから抜ける
-                                </Button>
-                            </div>
-                        </Card>
-                    </section>
-
-                    <section className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2">
-                            <AlertCircle size={18} className="text-red-400" />
-                            <h3 className="font-bold text-sm text-red-500">デッド操作</h3>
-                        </div>
-                        <Card className="p-4 border-red-100 bg-red-50/30">
-                            <div className="space-y-4">
-                                <p className="text-[10px] text-gray-500 leading-relaxed font-medium">データを削除すると元に戻せません。このグループのすべての対局記録が消去されます。</p>
-                                <Button variant="outline" className="w-full text-red-500 border-red-200 hover:bg-red-50" onClick={() => {
-                                    if (confirm("全てのデータをリセットしますか？この操作は取り消せません。")) {
-                                        localStorage.removeItem('mahjong-tracker-storage');
-                                        window.location.reload();
-                                    }
-                                }}>全てのデータをリセット</Button>
-                            </div>
-                        </Card>
-                    </section>
-
-                    <Button variant="secondary" className="w-full h-12" onClick={() => navigate('dashboard')}>戻る</Button>
-
-                    {/* Debug Info Footer */}
-                    <div className="mt-8 pt-4 border-t border-gray-200 text-[10px] text-gray-400 font-mono text-center">
-                        <p>App ID: {firebaseConfig.projectId}</p>
-                        <p>Auth Status: {isAuthenticated ? `Logged In (${firebase.auth().currentUser?.uid?.slice(0, 6)}...)` : 'Not Logged In'}</p>
-                        <p>Current Group: {group?.id ? group.id.slice(0, 8) + '...' : 'None'}</p>
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const { currentGroupId, currentView } = useStore();
-            const view = currentView || (currentGroupId ? 'dashboard' : 'onboarding');
-            return (
-                <Layout hideNav={view === 'onboarding'}>
-                    {view === 'onboarding' && <OnboardingView />}
-                    {view === 'dashboard' && <DashboardView />}
-                    {view === 'newMatch' && <NewMatchView />}
-                    {view === 'history' && <HistoryView />}
-                    {view === 'analytics' && <AnalyticsView />}
-                    {view === 'settings' && <SettingsView />}
-                </Layout>
-            );
-        };
-
-        ReactDOM.createRoot(document.getElementById('root')).render(<AppProvider><App /></AppProvider>);
-    </script>
+            watch([tab, chartMode], () => { if (tab.value === 'chart') nextTick(() => setTimeout(renderLineChart, 200)); });
+            
+            return {
+                currentRoomId, authMode, tab, loginForm, games, roomConfig, playerStats, globalStats, inputForm, handForm, showHandModal, selectedPlayer, chartMode,
+                joinRoom, saveGame, toggleYaku, filteredYaku, calculatedResult, canSelectYaku, addHandLog, openHandModal,
+                openPlayerDetail: (p) => { selectedPlayer.value = p; nextTick(() => setTimeout(() => renderPieChart(p), 200)); },
+                formatDate: (ts) => new Date(ts).toLocaleDateString(),
+                logout: () => location.reload()
+            };
+        }
+    }).mount('#app');
+</script>
 </body>
-
 </html>
