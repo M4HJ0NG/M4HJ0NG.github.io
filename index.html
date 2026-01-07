@@ -1,849 +1,1259 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAHJONG TRACKER PRO V5</title>
+    <title>MAHJONG TRACKER V1</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        :root { --main-green: #10b981; --bg-gray: #f4f7f6; --text-dark: #1e293b; }
-        body { background-color: var(--bg-gray); color: var(--text-dark); font-family: 'Inter', sans-serif; padding-bottom: 100px; }
-        .card { border-radius: 24px; border: none; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 1rem; overflow: hidden; background: white; }
-        .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid #edf2f7; z-index: 1000; }
-        .nav-item { border: none; background: none; color: #94a3b8; font-size: 1.4rem; position: relative; transition: 0.3s; }
-        .nav-item.active { color: var(--main-green); transform: translateY(-2px); }
-        .btn-plus-fixed { background: var(--main-green); color: white; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin-top: -35px; border: 6px solid var(--bg-gray); box-shadow: 0 8px 20px rgba(16,185,129,0.4); }
-        
-        .yaku-node { padding: 6px 4px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.75rem; text-align: center; background: white; cursor: pointer; height: 100%; display: flex; align-items: center; justify-content: center; transition: 0.1s; user-select: none; position: relative; }
-        .yaku-node.active { background: var(--main-green); color: white; border-color: var(--main-green); font-weight: bold; }
-        .yaku-node.disabled { opacity: 0.3; pointer-events: none; background: #f1f5f9; }
-        
+        :root {
+            --main-green: #10b981;
+            --bg-gray: #f4f7f6;
+            --text-dark: #1e293b;
+        }
+
+        body {
+            background-color: var(--bg-gray);
+            color: var(--text-dark);
+            font-family: 'Inter', sans-serif;
+            padding-bottom: 100px;
+        }
+
+        .card {
+            border-radius: 24px;
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1rem;
+            overflow: hidden;
+            background: white;
+        }
+
+        .nav-bottom {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            border-top: 1px solid #edf2f7;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            border: none;
+            background: none;
+            color: #94a3b8;
+            font-size: 1.4rem;
+            position: relative;
+            transition: 0.3s;
+        }
+
+        .nav-item.active {
+            color: var(--main-green);
+            transform: translateY(-2px);
+        }
+
+        .btn-plus-fixed {
+            background: var(--main-green);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-top: -35px;
+            border: 6px solid var(--bg-gray);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .yaku-node {
+            padding: 6px 4px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.1s;
+            user-select: none;
+            position: relative;
+        }
+
+        .yaku-node.active {
+            background: var(--main-green);
+            color: white;
+            border-color: var(--main-green);
+            font-weight: bold;
+        }
+
+        .yaku-node.disabled {
+            opacity: 0.3;
+            pointer-events: none;
+            background: #f1f5f9;
+        }
+
         /* ドラ用スタイル */
-        .yaku-node.dora-active { background: #f59e0b; color: white; border-color: #f59e0b; font-weight: bold; }
-        .dora-counter { position: absolute; bottom: -8px; right: -8px; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .yaku-node.dora-active {
+            background: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+            font-weight: bold;
+        }
 
-        .summary-box { background: white; border-radius: 16px; padding: 12px; text-align: center; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .val-large { font-size: 1.1rem; font-weight: 800; color: var(--main-green); display: block; line-height: 1.2; }
-        .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .stat-item { background: #f8fafc; padding: 10px; border-radius: 12px; text-align: center; }
-        .form-select-sm, .form-control-sm { font-size: 0.85rem; }
-        
+        .dora-counter {
+            position: absolute;
+            bottom: -8px;
+            right: -8px;
+            background: red;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .summary-box {
+            background: white;
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+            flex: 1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .val-large {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--main-green);
+            display: block;
+            line-height: 1.2;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .stat-item {
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .form-select-sm,
+        .form-control-sm {
+            font-size: 0.85rem;
+        }
+
         /* カウンターボタン */
-        .btn-circle-sm { width: 24px; height: 24px; padding: 0; border-radius: 50%; font-size: 12px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
-        
-        /* 新しい統計バッジ */
-        .stat-badge { font-size: 0.7rem; padding: 4px 8px; border-radius: 6px; background: #edf2f7; color: #64748b; font-weight: 600; display:inline-block; margin-right:4px; margin-bottom:4px;}
+        .btn-circle-sm {
+            width: 24px;
+            height: 24px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 12px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-        [v-cloak] { display: none; }
+        /* 新しい統計バッジ */
+        .stat-badge {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #edf2f7;
+            color: #64748b;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 4px;
+            margin-bottom: 4px;
+        }
+
+        .version-info {
+            position: fixed;
+            top: 8px;
+            left: 8px;
+            font-size: 0.65rem;
+            color: #94a3b8;
+            opacity: 0.6;
+            z-index: 999;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        [v-cloak] {
+            display: none;
+        }
     </style>
 </head>
+
 <body>
 
-<div id="app" v-cloak>
-    <div v-if="!currentRoomId" class="container d-flex justify-content-center align-items-center" style="min-height: 100vh;">
-        <div class="text-center w-100 px-4" style="max-width: 400px;">
-            <h1 class="fw-black mb-4 display-6">MAHJONG<br><span style="color:var(--main-green)">TRACKER</span></h1>
-            <div class="card p-4 shadow-lg">
-                <div class="btn-group w-100 mb-4 bg-light rounded-pill p-1">
-                    <button class="btn rounded-pill border-0" :class="authMode==='login'?'bg-white shadow-sm fw-bold':'text-muted'" @click="authMode='login'">入室</button>
-                    <button class="btn rounded-pill border-0" :class="authMode==='create'?'bg-white shadow-sm fw-bold':'text-muted'" @click="authMode='create'">新規作成</button>
-                </div>
-                <input type="text" v-model="loginForm.room" class="form-control mb-2 rounded-pill p-3 border-0 bg-light" placeholder="グループID (例: my-team)">
-                <input type="password" v-model="loginForm.pass" class="form-control mb-4 rounded-pill p-3 border-0 bg-light" placeholder="合言葉">
-                <button @click="joinRoom(authMode)" class="btn btn-success w-100 rounded-pill py-3 fw-bold">
-                    {{ authMode === 'login' ? 'ログイン' : 'グループ作成' }}
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div v-else class="container pt-3">
-        <div class="d-flex justify-content-between align-items-center mb-3 px-2">
-            <h4 class="fw-black m-0" @click="tab='dashboard'; selectedPlayer=null">RANKING</h4>
-            <div class="badge bg-white text-dark border rounded-pill px-3 py-2 small fw-bold shadow-sm">ID: {{ currentRoomId }}</div>
-        </div>
-
-        <div v-if="tab === 'dashboard' && !selectedPlayer">
-            <div class="d-flex gap-2 mb-4">
-                <div class="summary-box">
-                    <span class="x-small text-muted d-block">平均順位</span>
-                    <span class="val-large">{{ globalStats.avgRank }}<small class="x-small text-muted fw-normal">位</small></span>
-                </div>
-                <div class="summary-box">
-                    <span class="x-small text-muted d-block">平均和了</span>
-                    <span class="val-large">{{ globalStats.avgScore }}</span>
-                </div>
-                <div class="summary-box">
-                    <span class="x-small text-muted d-block">総対局数</span>
-                    <span class="val-large text-dark">{{ globalStats.totalGames }}<small class="x-small text-muted fw-normal">戦</small></span>
-                </div>
-            </div>
-
-            <div v-for="(s, i) in displayStats" :key="s.name" class="card p-3 mb-2 d-flex flex-row align-items-center shadow-sm click-effect" @click="openPlayerDetail(s)">
-                <div class="me-3 fw-bold" :class="i===0?'text-warning':(i===1?'text-secondary':'text-muted')" style="width:20px; font-size:1.2rem;">{{ i+1 }}</div>
-                <div class="flex-grow-1">
-                    <div class="fw-bold">{{ s.name }}</div>
-                    <div class="x-small text-muted">
-                        {{ s.games }}戦 / 平均 {{ s.avgRank }}位 / トップ {{ s.topRate }}%
+    <div id="app" v-cloak>
+        <div class="version-info">v1.6.1</div>
+        <div v-if="!currentRoomId" class="container d-flex justify-content-center align-items-center"
+            style="min-height: 100vh;">
+            <div class="text-center w-100 px-4" style="max-width: 400px;">
+                <h1 class="fw-black mb-4 display-6">MAHJONG<br><span style="color:var(--main-green)">TRACKER</span></h1>
+                <div class="card p-4 shadow-lg">
+                    <div class="btn-group w-100 mb-4 bg-light rounded-pill p-1">
+                        <button class="btn rounded-pill border-0"
+                            :class="authMode==='login'?'bg-white shadow-sm fw-bold':'text-muted'"
+                            @click="authMode='login'">入室</button>
+                        <button class="btn rounded-pill border-0"
+                            :class="authMode==='create'?'bg-white shadow-sm fw-bold':'text-muted'"
+                            @click="authMode='create'">新規作成</button>
                     </div>
-                </div>
-                <div class="text-end fw-bold fs-5" :class="s.totalScore >= 0 ? 'text-success':'text-danger'">
-                    {{ s.totalScore >= 0 ? '+':'' }}{{ s.totalScore }}
+                    <input type="text" v-model="loginForm.room"
+                        class="form-control mb-2 rounded-pill p-3 border-0 bg-light" placeholder="グループID (例: my-team)">
+                    <input type="password" v-model="loginForm.pass"
+                        class="form-control mb-4 rounded-pill p-3 border-0 bg-light" placeholder="合言葉">
+                    <button @click="joinRoom(authMode)" class="btn btn-success w-100 rounded-pill py-3 fw-bold">
+                        {{ authMode === 'login' ? 'ログイン' : 'グループ作成' }}
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div v-if="selectedPlayer" class="animate__animated animate__fadeIn">
-            <button class="btn btn-link text-dark p-0 mb-3 text-decoration-none" @click="selectedPlayer = null"><i class="bi bi-chevron-left"></i> 戻る</button>
-            <div class="card p-4 mb-3 border-0 bg-white shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold m-0">{{ selectedPlayer.name }}</h5>
-                    <span class="badge rounded-pill p-2 px-3" :class="selectedPlayer.totalScore >= 0 ? 'bg-success':'bg-danger'">{{ selectedPlayer.totalScore }} pt</span>
-                </div>
-                
-                <div class="mb-3 text-center">
-                    <span class="stat-badge text-success">トップ率 {{ selectedPlayer.topRate }}%</span>
-                    <span class="stat-badge text-primary">連対率 {{ selectedPlayer.rentaiRate }}%</span>
-                    <span class="stat-badge text-warning">ラス回避 {{ selectedPlayer.avoidLastRate }}%</span>
-                </div>
-
-                <div class="stat-grid mb-4">
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">対局数</small>
-                        <strong class="h5 m-0">{{ selectedPlayer.games }}</strong>
-                    </div>
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">平均着順</small>
-                        <strong class="h5 m-0">{{ selectedPlayer.avgRank }}<small class="fs-6 fw-normal">位</small></strong>
-                    </div>
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">平均収支</small>
-                        <strong class="h5 m-0" :class="selectedPlayer.avgScorePerGame>=0?'text-success':'text-danger'">{{ selectedPlayer.avgScorePerGame }}</strong>
-                    </div>
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">和了率</small>
-                        <strong class="h5 m-0">{{ selectedPlayer.winRate }}%</strong>
-                    </div>
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">放銃率</small>
-                        <strong class="h5 m-0 text-danger">{{ selectedPlayer.loseRate }}%</strong>
-                    </div>
-                    <div class="stat-item">
-                        <small class="text-muted d-block x-small">最大打点</small>
-                        <strong class="h5 m-0 text-primary">{{ selectedPlayer.maxHand }}</strong>
-                    </div>
-                </div>
-
-                <h6 class="fw-bold x-small text-muted mb-2">役分布 (Top 5)</h6>
-                <div style="height: 200px;"><canvas id="yakuPieChart"></canvas></div>
+        <div v-else class="container pt-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+                <h4 class="fw-black m-0" @click="tab='dashboard'; selectedPlayer=null">RANKING</h4>
+                <div class="badge bg-white text-dark border rounded-pill px-3 py-2 small fw-bold shadow-sm">ID: {{
+                    currentRoomId }}</div>
             </div>
-        </div>
 
-        <div v-if="tab === 'chart'">
-            <div class="card p-4 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h6 class="fw-bold m-0">直近の収支推移 (Max 100戦)</h6>
-                    <select v-model="chartMode" class="form-select form-select-sm w-auto rounded-pill border-0 bg-light">
-                        <option value="top4">上位4名</option>
-                        <option value="all">全員</option>
-                    </select>
+            <div v-if="tab === 'dashboard' && !selectedPlayer">
+                <div class="d-flex gap-2 mb-4">
+                    <div class="summary-box">
+                        <span class="x-small text-muted d-block">平均順位</span>
+                        <span class="val-large">{{ globalStats.avgRank }}<small
+                                class="x-small text-muted fw-normal">位</small></span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="x-small text-muted d-block">平均和了</span>
+                        <span class="val-large">{{ globalStats.avgScore }}</span>
+                    </div>
+                    <div class="summary-box">
+                        <span class="x-small text-muted d-block">総対局数</span>
+                        <span class="val-large text-dark">{{ globalStats.totalGames }}<small
+                                class="x-small text-muted fw-normal">戦</small></span>
+                    </div>
                 </div>
-                <div style="height: 350px;"><canvas id="scoreChart"></canvas></div>
-            </div>
-        </div>
 
-        <div v-if="tab === 'input'">
-             <div class="card p-4 shadow-sm">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                     <h6 class="fw-bold m-0">対局記録</h6>
-                     <div class="d-flex gap-2">
-                         <input type="datetime-local" v-model="inputForm.datetime" class="form-control form-control-sm border-0 bg-light rounded-pill" style="width: auto;">
-                         <button class="btn btn-sm btn-outline-danger rounded-pill x-small" @click="resetInput">リセット</button>
-                     </div>
-                </div>
-                
-                <div class="row g-2 mb-4">
-                    <div v-for="(p, i) in inputForm.players" :key="i" class="col-6">
-                        <div class="p-2 border rounded-4 bg-light text-center position-relative">
-                            <input type="text" v-model="inputForm.players[i]" class="form-control form-control-sm border-0 bg-transparent text-center fw-bold mb-1 p-0" placeholder="名前">
-                            <input type="number" v-model.number="inputForm.rawScores[i]" class="form-control form-control-sm border-0 bg-transparent text-center text-primary h5 m-0 p-0 fw-bold">
-                            <div class="position-absolute top-0 start-0 m-1 x-small text-muted fw-bold">{{ ['東','南','西','北'][i] }}</div>
+                <div v-for="(s, i) in displayStats" :key="s.name"
+                    class="card p-3 mb-2 d-flex flex-row align-items-center shadow-sm click-effect"
+                    @click="openPlayerDetail(s)">
+                    <div class="me-3 fw-bold" :class="i===0?'text-warning':(i===1?'text-secondary':'text-muted')"
+                        style="width:20px; font-size:1.2rem;">{{ i+1 }}</div>
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">{{ s.name }}</div>
+                        <div class="x-small text-muted">
+                            {{ s.games }}戦 / 平均 {{ s.avgRank }}位 / トップ {{ s.topRate }}%
                         </div>
                     </div>
+                    <div class="text-end fw-bold fs-5" :class="s.totalScore >= 0 ? 'text-success':'text-danger'">
+                        {{ s.totalScore >= 0 ? '+':'' }}{{ s.totalScore }}
+                    </div>
                 </div>
+            </div>
 
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="small fw-bold text-muted">和了・放銃ログ ({{ inputForm.logs.length }})</span>
-                        <button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" @click="openHandModal()">
-                            <i class="bi bi-plus-lg"></i> 追加
-                        </button>
+            <div v-if="selectedPlayer" class="animate__animated animate__fadeIn">
+                <button class="btn btn-link text-dark p-0 mb-3 text-decoration-none" @click="selectedPlayer = null"><i
+                        class="bi bi-chevron-left"></i> 戻る</button>
+                <div class="card p-4 mb-3 border-0 bg-white shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold m-0">{{ selectedPlayer.name }}</h5>
+                        <span class="badge rounded-pill p-2 px-3"
+                            :class="selectedPlayer.totalScore >= 0 ? 'bg-success':'bg-danger'">{{
+                            selectedPlayer.totalScore }} pt</span>
                     </div>
-                    <div v-if="inputForm.logs.length === 0" class="text-center text-muted small py-3 bg-light rounded-3">
-                        記録はありません
+
+                    <div class="mb-3 text-center">
+                        <span class="stat-badge text-success">トップ率 {{ selectedPlayer.topRate }}%</span>
+                        <span class="stat-badge text-primary">連対率 {{ selectedPlayer.rentaiRate }}%</span>
+                        <span class="stat-badge text-warning">ラス回避 {{ selectedPlayer.avoidLastRate }}%</span>
                     </div>
-                    <div v-for="(l, idx) in inputForm.logs" class="bg-white border p-2 rounded-3 mb-2 small d-flex justify-content-between align-items-center shadow-sm">
-                        <div>
-                            <span class="badge bg-light text-dark border me-2">{{ l.roundName }}</span>
-                            <span class="fw-bold">{{ l.winner }}</span> 
-                            <span v-if="l.loser" class="text-muted mx-1">←</span> 
-                            <span v-if="l.loser" class="text-danger">{{ l.loser }}</span>
-                            <span v-else class="badge bg-success ms-1" style="font-size:0.6rem">ツモ</span>
+
+                    <div class="stat-grid mb-4">
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">対局数</small>
+                            <strong class="h5 m-0">{{ selectedPlayer.games }}</strong>
                         </div>
-                        <div class="d-flex align-items-center">
-                            <span class="fw-bold me-2">{{ l.score }}</span>
-                            <button class="btn btn-link text-muted p-0" @click="inputForm.logs.splice(idx, 1)"><i class="bi bi-x-circle-fill"></i></button>
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">平均着順</small>
+                            <strong class="h5 m-0">{{ selectedPlayer.avgRank }}<small
+                                    class="fs-6 fw-normal">位</small></strong>
+                        </div>
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">平均収支</small>
+                            <strong class="h5 m-0"
+                                :class="selectedPlayer.avgScorePerGame>=0?'text-success':'text-danger'">{{
+                                selectedPlayer.avgScorePerGame }}</strong>
+                        </div>
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">和了率</small>
+                            <strong class="h5 m-0">{{ selectedPlayer.winRate }}%</strong>
+                        </div>
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">放銃率</small>
+                            <strong class="h5 m-0 text-danger">{{ selectedPlayer.loseRate }}%</strong>
+                        </div>
+                        <div class="stat-item">
+                            <small class="text-muted d-block x-small">最大打点</small>
+                            <strong class="h5 m-0 text-primary">{{ selectedPlayer.maxHand }}</strong>
                         </div>
                     </div>
-                </div>
-                <button class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-lg" @click="saveGame">結果を保存</button>
-            </div>
-        </div>
 
-        <div v-if="tab === 'history'">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold m-0">直近の対局履歴</h6>
-                <small class="text-muted">保存件数: {{ games.length }}</small>
-            </div>
-            <div v-for="g in games" :key="g.id" class="card p-3 mb-2 shadow-sm">
-                <div class="d-flex justify-content-between x-small text-muted mb-2">
-                    <span>{{ formatDate(g.d) }}</span>
-                    <span>{{ g.config?.uma || '10-20' }} / {{ g.config?.kaeshi ? g.config.kaeshi/10000 + '万返し' : '-'}}</span>
-                </div>
-                <div class="row g-1">
-                    <div v-for="(p, i) in g.p" :key="i" class="col-6 small d-flex justify-content-between px-2 align-items-center">
-                        <span class="text-truncate">{{ p }}</span>
-                        <span class="fw-bold" :class="g.s[i] >= 0 ? 'text-success':'text-danger'">{{ g.s[i] }}</span>
-                    </div>
+                    <h6 class="fw-bold x-small text-muted mb-2">役分布 (Top 5)</h6>
+                    <div style="height: 200px;"><canvas id="yakuPieChart"></canvas></div>
                 </div>
             </div>
-        </div>
 
-        <div v-if="tab === 'settings'">
-            <div class="card p-4 mb-3">
-                <h6 class="fw-bold mb-3">対局ルール設定</h6>
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="x-small text-muted">返し点</label>
-                        <select v-model.number="roomConfig.kaeshi" class="form-select form-select-sm bg-light border-0">
-                            <option :value="25000">25,000</option>
-                            <option :value="30000">30,000</option>
+            <div v-if="tab === 'chart'">
+                <div class="card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h6 class="fw-bold m-0">直近の収支推移 (Max 100戦)</h6>
+                        <select v-model="chartMode"
+                            class="form-select form-select-sm w-auto rounded-pill border-0 bg-light">
+                            <option value="top4">上位4名</option>
+                            <option value="all">全員</option>
                         </select>
                     </div>
-                    <div class="col-6">
-                        <label class="x-small text-muted">オカ (Top賞)</label>
-                        <input type="number" v-model.number="roomConfig.oka" class="form-control form-control-sm bg-light border-0" placeholder="20">
-                    </div>
-                    <div class="col-12">
-                        <label class="x-small text-muted">ウマ (10-20形式 または 20,10,-10,-20)</label>
-                        <input type="text" v-model="roomConfig.uma" class="form-control form-control-sm bg-light border-0" placeholder="10-20">
-                        <div class="form-text x-small">※ "10-20" は 3位-10, 4位-20, 2位+10, 1位+20 と解釈されます。<br>※ カンマ区切りで "30,10,-10,-30" のように4人分指定も可能です。</div>
-                    </div>
-                </div>
-                <div class="bg-light p-3 rounded-3">
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" v-model="roomConfig.kiriage">
-                        <label class="form-check-label small">切り上げ満貫 (30符4翻/60符3翻→満貫)</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" v-model="roomConfig.doubleYakuman">
-                        <label class="form-check-label small">ダブル役満有効 (純粋な2倍役満)</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" v-model="roomConfig.localYaku">
-                        <label class="form-check-label small">ローカル役 (雀魂準拠: 大車輪/大七星/流し満貫/人和)</label>
-                    </div>
+                    <div style="height: 350px;"><canvas id="scoreChart"></canvas></div>
                 </div>
             </div>
-            <button class="btn btn-outline-danger w-100 rounded-pill" @click="logout">ログアウト</button>
-        </div>
 
-        <div v-if="showHandModal" class="modal d-block" style="background:rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index:2000; overflow-y:auto;">
-            <div class="modal-dialog modal-dialog-centered px-2">
-                <div class="modal-content rounded-4 border-0 shadow-lg animate__animated animate__slideInUp">
-                    <div class="modal-body p-3">
-                        <h6 class="text-center fw-bold mb-3">和了詳細入力</h6>
-                        
-                        <div class="row g-1 mb-2">
-                            <div class="col-4">
-                                <select v-model="handForm.ba" class="form-select form-select-sm rounded-pill text-center"><option value="0">東</option><option value="1">南</option><option value="2">西</option></select>
-                            </div>
-                            <div class="col-4">
-                                <select v-model="handForm.kyoku" class="form-select form-select-sm rounded-pill text-center"><option v-for="n in 4" :value="n">{{n}}局</option></select>
-                            </div>
-                            <div class="col-4">
-                                <select v-model="handForm.honba" class="form-select form-select-sm rounded-pill text-center"><option value="0">0本場</option><option v-for="n in 20" :value="n">{{n}}本場</option></select>
-                            </div>
-                        </div>
-
-                        <div class="card bg-light border-0 p-2 mb-2">
-                            <div class="row g-2 align-items-center">
-                                <div class="col-5">
-                                    <label class="x-small text-muted ms-1">和了</label>
-                                    <select v-model="handForm.winnerIdx" class="form-select form-select-sm fw-bold"><option v-for="(p,i) in inputForm.players" :value="i">{{p}}</option></select>
-                                    <div class="form-check mt-1 ms-1">
-                                        <input class="form-check-input" type="checkbox" v-model="handForm.isWinnerDealer" id="chkDealer">
-                                        <label class="form-check-label x-small" for="chkDealer">親番</label>
-                                    </div>
-                                </div>
-                                <div class="col-2 text-center text-muted"><i class="bi bi-arrow-left"></i></div>
-                                <div class="col-5">
-                                    <label class="x-small text-muted ms-1">放銃 (空=ツモ)</label>
-                                    <select v-model="handForm.loserIdx" class="form-select form-select-sm"><option :value="null">ツモ</option><option v-for="(p,i) in inputForm.players" :value="i" v-show="i!==handForm.winnerIdx">{{p}}</option></select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="btn-group w-100 mb-2 bg-light rounded-pill p-1">
-                            <button class="btn btn-sm rounded-pill py-1" :class="handForm.isMenzen?'bg-white shadow-sm fw-bold':''" @click="handForm.isMenzen=true">門前</button>
-                            <button class="btn btn-sm rounded-pill py-1" :class="!handForm.isMenzen?'bg-white shadow-sm fw-bold':''" @click="handForm.isMenzen=false">副露</button>
-                        </div>
-                        <div class="row g-1 mb-2 overflow-auto p-1" style="max-height: 220px;">
-                            <div v-for="y in filteredYaku" :key="y.id" class="col-4">
-                                <div v-if="y.isDora" class="yaku-node shadow-sm" :class="{ 'dora-active': handForm.selectedYaku.includes(y.id) }" @click="toggleYaku(y)">
-                                    {{ y.name }}
-                                    <div v-if="handForm.selectedYaku.includes(y.id)" class="mt-1 d-flex align-items-center justify-content-center gap-1" @click.stop>
-                                        <button class="btn btn-light btn-circle-sm shadow-sm" @click.stop="changeDoraCount(y.id, -1)">-</button>
-                                        <span class="fw-bold text-white small">{{ handForm.doraCounts[y.id] || 0 }}</span>
-                                        <button class="btn btn-light btn-circle-sm shadow-sm" @click.stop="changeDoraCount(y.id, 1)">+</button>
-                                    </div>
-                                </div>
-                                <div v-else class="yaku-node shadow-sm" :class="{active: handForm.selectedYaku.includes(y.id), disabled: !canSelectYaku(y)}" @click="toggleYaku(y)">{{ y.name }}</div>
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-3 align-items-center">
-                            <div class="col-4">
-                                <label class="x-small text-muted ps-1">符</label>
-                                <select v-model.number="handForm.fu" class="form-select form-select-sm rounded-pill text-center">
-                                    <option v-for="f in [20,25,30,40,50,60,70,80,90,100,110]" :value="f">{{f}}符</option>
-                                </select>
-                            </div>
-                            <div class="col-8">
-                                <div class="d-flex justify-content-end gap-2">
-                                     <div class="form-check form-switch x-small pt-1">
-                                        <input class="form-check-input" type="checkbox" v-model="roomConfig.kiriage">
-                                        <label class="form-check-label text-muted">切上</label>
-                                    </div>
-                                    <div class="form-check form-switch x-small pt-1">
-                                        <input class="form-check-input" type="checkbox" v-model="roomConfig.doubleYakuman">
-                                        <label class="form-check-label text-muted">W役満</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="bg-dark text-white p-3 rounded-4 text-center mb-3 position-relative overflow-hidden">
-                            <div class="position-absolute top-0 start-0 w-100 h-100" style="background: linear-gradient(45deg, #10b981, #059669); opacity:0.1;"></div>
-                            <div class="h2 fw-black m-0 position-relative" style="letter-spacing: 1px;">{{ calculatedResult.score }}</div>
-                            <small class="d-block text-white-50 position-relative">{{ calculatedResult.text }}</small>
-                        </div>
-
+            <div v-if="tab === 'input'">
+                <div class="card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold m-0">対局記録</h6>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-light flex-grow-1 rounded-pill" @click="showHandModal=false">キャンセル</button>
-                            <button class="btn btn-success flex-grow-1 rounded-pill fw-bold" @click="addHandLog">決定</button>
+                            <input type="datetime-local" v-model="inputForm.datetime"
+                                class="form-control form-control-sm border-0 bg-light rounded-pill"
+                                style="width: auto;">
+                            <button class="btn btn-sm btn-outline-danger rounded-pill x-small"
+                                @click="resetInput">リセット</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div v-for="(p, i) in inputForm.players" :key="i" class="col-6">
+                            <div class="p-2 border rounded-4 bg-light text-center position-relative">
+                                <div class="d-flex align-items-center gap-1 mb-1">
+                                    <input type="text" v-model="inputForm.players[i]"
+                                        class="form-control form-control-sm border-0 bg-transparent text-center fw-bold p-0 flex-grow-1"
+                                        placeholder="名前" :list="'playerList' + i">
+                                    <datalist :id="'playerList' + i">
+                                        <option v-for="name in registeredPlayers" :key="name" :value="name"></option>
+                                    </datalist>
+                                    <div class="dropdown">
+                                        <button class="btn btn-sm btn-link text-muted p-0" type="button"
+                                            :id="'playerDropdown' + i" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end"
+                                            :aria-labelledby="'playerDropdown' + i"
+                                            style="max-height: 200px; overflow-y: auto;">
+                                            <li v-for="name in registeredPlayers" :key="name">
+                                                <a class="dropdown-item small" href="#"
+                                                    @click.prevent="inputForm.players[i] = name">{{ name }}</a>
+                                            </li>
+                                            <li v-if="registeredPlayers.length === 0">
+                                                <span class="dropdown-item-text small text-muted">登録済みのプレイヤーがいません</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <input type="number" v-model.number="inputForm.rawScores[i]"
+                                    class="form-control form-control-sm border-0 bg-transparent text-center text-primary h5 m-0 p-0 fw-bold">
+                                <div class="position-absolute top-0 start-0 m-1 x-small text-muted fw-bold">{{
+                                    ['東','南','西','北'][i] }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-bold text-muted">和了・放銃ログ ({{ inputForm.logs.length }})</span>
+                            <button class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" @click="openHandModal()">
+                                <i class="bi bi-plus-lg"></i> 追加
+                            </button>
+                        </div>
+                        <div v-if="inputForm.logs.length === 0"
+                            class="text-center text-muted small py-3 bg-light rounded-3">
+                            記録はありません
+                        </div>
+                        <div v-for="(l, idx) in inputForm.logs"
+                            class="bg-white border p-2 rounded-3 mb-2 small d-flex justify-content-between align-items-center shadow-sm">
+                            <div>
+                                <span class="badge bg-light text-dark border me-2">{{ l.roundName }}</span>
+                                <span class="fw-bold">{{ l.winner }}</span>
+                                <span v-if="l.loser" class="text-muted mx-1">←</span>
+                                <span v-if="l.loser" class="text-danger">{{ l.loser }}</span>
+                                <span v-else class="badge bg-success ms-1" style="font-size:0.6rem">ツモ</span>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <span class="fw-bold me-2">{{ l.score }}</span>
+                                <button class="btn btn-link text-muted p-0" @click="inputForm.logs.splice(idx, 1)"><i
+                                        class="bi bi-x-circle-fill"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-success w-100 rounded-pill py-3 fw-bold shadow-lg"
+                        @click="saveGame">結果を保存</button>
+                </div>
+            </div>
+
+            <div v-if="tab === 'history'">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold m-0">直近の対局履歴</h6>
+                    <small class="text-muted">保存件数: {{ games.length }}</small>
+                </div>
+                <div v-for="g in games" :key="g.id" class="card p-3 mb-2 shadow-sm">
+                    <div class="d-flex justify-content-between x-small text-muted mb-2">
+                        <span>{{ formatDate(g.d) }}</span>
+                        <span>{{ g.config?.uma || '10-20' }} / {{ g.config?.kaeshi ? g.config.kaeshi/10000 + '万返し' :
+                            '-'}}</span>
+                    </div>
+                    <div class="row g-1">
+                        <div v-for="(p, i) in g.p" :key="i"
+                            class="col-6 small d-flex justify-content-between px-2 align-items-center">
+                            <span class="text-truncate">{{ p }}</span>
+                            <span class="fw-bold" :class="g.s[i] >= 0 ? 'text-success':'text-danger'">{{ g.s[i]
+                                }}</span>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <div v-if="tab === 'settings'">
+                <div class="card p-4 mb-3">
+                    <h6 class="fw-bold mb-3">対局ルール設定</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="x-small text-muted">返し点</label>
+                            <select v-model.number="roomConfig.kaeshi"
+                                class="form-select form-select-sm bg-light border-0">
+                                <option :value="25000">25,000</option>
+                                <option :value="30000">30,000</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="x-small text-muted">オカ (Top賞)</label>
+                            <input type="number" v-model.number="roomConfig.oka"
+                                class="form-control form-control-sm bg-light border-0" placeholder="20">
+                        </div>
+                        <div class="col-12">
+                            <label class="x-small text-muted">ウマ (10-20形式 または 20,10,-10,-20)</label>
+                            <input type="text" v-model="roomConfig.uma"
+                                class="form-control form-control-sm bg-light border-0" placeholder="10-20">
+                            <div class="form-text x-small">※ "10-20" は 3位-10, 4位-20, 2位+10, 1位+20 と解釈されます。<br>※ カンマ区切りで
+                                "30,10,-10,-30" のように4人分指定も可能です。</div>
+                        </div>
+                    </div>
+                    <div class="bg-light p-3 rounded-3">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" v-model="roomConfig.kiriage">
+                            <label class="form-check-label small">切り上げ満貫 (30符4翻/60符3翻→満貫)</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" v-model="roomConfig.doubleYakuman">
+                            <label class="form-check-label small">ダブル役満有効 (純粋な2倍役満)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" v-model="roomConfig.localYaku">
+                            <label class="form-check-label small">ローカル役 (雀魂準拠: 大車輪/大七星/流し満貫/人和)</label>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-outline-danger w-100 rounded-pill" @click="logout">ログアウト</button>
+            </div>
+
+            <div v-if="showHandModal" class="modal d-block"
+                style="background:rgba(0,0,0,0.6); backdrop-filter: blur(5px); z-index:2000; overflow-y:auto;">
+                <div class="modal-dialog modal-dialog-centered px-2">
+                    <div class="modal-content rounded-4 border-0 shadow-lg animate__animated animate__slideInUp">
+                        <div class="modal-body p-3">
+                            <h6 class="text-center fw-bold mb-3">和了詳細入力</h6>
+
+                            <div class="row g-1 mb-2">
+                                <div class="col-4">
+                                    <select v-model="handForm.ba"
+                                        class="form-select form-select-sm rounded-pill text-center">
+                                        <option value="0">東</option>
+                                        <option value="1">南</option>
+                                        <option value="2">西</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <select v-model="handForm.kyoku"
+                                        class="form-select form-select-sm rounded-pill text-center">
+                                        <option v-for="n in 4" :value="n">{{n}}局</option>
+                                    </select>
+                                </div>
+                                <div class="col-4">
+                                    <select v-model="handForm.honba"
+                                        class="form-select form-select-sm rounded-pill text-center">
+                                        <option value="0">0本場</option>
+                                        <option v-for="n in 20" :value="n">{{n}}本場</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="card bg-light border-0 p-2 mb-2">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-5">
+                                        <label class="x-small text-muted ms-1">和了</label>
+                                        <select v-model="handForm.winnerIdx" class="form-select form-select-sm fw-bold">
+                                            <option v-for="(p,i) in inputForm.players" :value="i">{{p}}</option>
+                                        </select>
+                                        <div class="form-check mt-1 ms-1">
+                                            <input class="form-check-input" type="checkbox"
+                                                v-model="handForm.isWinnerDealer" id="chkDealer">
+                                            <label class="form-check-label x-small" for="chkDealer">親番</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-2 text-center text-muted"><i class="bi bi-arrow-left"></i></div>
+                                    <div class="col-5">
+                                        <label class="x-small text-muted ms-1">放銃 (空=ツモ)</label>
+                                        <select v-model="handForm.loserIdx" class="form-select form-select-sm">
+                                            <option :value="null">ツモ</option>
+                                            <option v-for="(p,i) in inputForm.players" :value="i"
+                                                v-show="i!==handForm.winnerIdx">{{p}}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="btn-group w-100 mb-2 bg-light rounded-pill p-1">
+                                <button class="btn btn-sm rounded-pill py-1"
+                                    :class="handForm.isMenzen?'bg-white shadow-sm fw-bold':''"
+                                    @click="handForm.isMenzen=true">門前</button>
+                                <button class="btn btn-sm rounded-pill py-1"
+                                    :class="!handForm.isMenzen?'bg-white shadow-sm fw-bold':''"
+                                    @click="handForm.isMenzen=false">副露</button>
+                            </div>
+                            <div class="row g-1 mb-2 overflow-auto p-1" style="max-height: 220px;">
+                                <div v-for="y in filteredYaku" :key="y.id" class="col-4">
+                                    <div v-if="y.isDora" class="yaku-node shadow-sm"
+                                        :class="{ 'dora-active': handForm.selectedYaku.includes(y.id) }"
+                                        @click="toggleYaku(y)">
+                                        {{ y.name }}
+                                        <div v-if="handForm.selectedYaku.includes(y.id)"
+                                            class="mt-1 d-flex align-items-center justify-content-center gap-1"
+                                            @click.stop>
+                                            <button class="btn btn-light btn-circle-sm shadow-sm"
+                                                @click.stop="changeDoraCount(y.id, -1)">-</button>
+                                            <span class="fw-bold text-white small">{{ handForm.doraCounts[y.id] || 0
+                                                }}</span>
+                                            <button class="btn btn-light btn-circle-sm shadow-sm"
+                                                @click.stop="changeDoraCount(y.id, 1)">+</button>
+                                        </div>
+                                    </div>
+                                    <div v-else class="yaku-node shadow-sm"
+                                        :class="{active: handForm.selectedYaku.includes(y.id), disabled: !canSelectYaku(y)}"
+                                        @click="toggleYaku(y)">{{ y.name }}</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-2 mb-3 align-items-center">
+                                <div class="col-4">
+                                    <label class="x-small text-muted ps-1">符</label>
+                                    <select v-model.number="handForm.fu"
+                                        class="form-select form-select-sm rounded-pill text-center">
+                                        <option v-for="f in [20,25,30,40,50,60,70,80,90,100,110]" :value="f">{{f}}符
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="col-8">
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <div class="form-check form-switch x-small pt-1">
+                                            <input class="form-check-input" type="checkbox"
+                                                v-model="roomConfig.kiriage">
+                                            <label class="form-check-label text-muted">切上</label>
+                                        </div>
+                                        <div class="form-check form-switch x-small pt-1">
+                                            <input class="form-check-input" type="checkbox"
+                                                v-model="roomConfig.doubleYakuman">
+                                            <label class="form-check-label text-muted">W役満</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="bg-dark text-white p-3 rounded-4 text-center mb-3 position-relative overflow-hidden">
+                                <div class="position-absolute top-0 start-0 w-100 h-100"
+                                    style="background: linear-gradient(45deg, #10b981, #059669); opacity:0.1;"></div>
+                                <div class="h2 fw-black m-0 position-relative" style="letter-spacing: 1px;">{{
+                                    calculatedResult.score }}</div>
+                                <small class="d-block text-white-50 position-relative">{{ calculatedResult.text
+                                    }}</small>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-light flex-grow-1 rounded-pill"
+                                    @click="showHandModal=false">キャンセル</button>
+                                <button class="btn btn-success flex-grow-1 rounded-pill fw-bold"
+                                    @click="addHandLog">決定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-bottom">
+                <button class="nav-item" :class="{active: tab==='dashboard'}"
+                    @click="tab='dashboard'; selectedPlayer=null"><i class="bi bi-house-door-fill"></i></button>
+                <button class="nav-item" :class="{active: tab==='history'}"
+                    @click="tab='history'; selectedPlayer=null"><i class="bi bi-clock-history"></i></button>
+                <button class="nav-item" @click="tab='input'; selectedPlayer=null">
+                    <div class="btn-plus-fixed"><i class="bi bi-plus-lg"></i></div>
+                </button>
+                <button class="nav-item" :class="{active: tab==='chart'}" @click="tab='chart'; selectedPlayer=null"><i
+                        class="bi bi-graph-up-arrow"></i></button>
+                <button class="nav-item" :class="{active: tab==='settings'}"
+                    @click="tab='settings'; selectedPlayer=null"><i class="bi bi-gear-wide-connected"></i></button>
+            </nav>
         </div>
-
-        <nav class="nav-bottom">
-            <button class="nav-item" :class="{active: tab==='dashboard'}" @click="tab='dashboard'; selectedPlayer=null"><i class="bi bi-house-door-fill"></i></button>
-            <button class="nav-item" :class="{active: tab==='history'}" @click="tab='history'; selectedPlayer=null"><i class="bi bi-clock-history"></i></button>
-            <button class="nav-item" @click="tab='input'; selectedPlayer=null"><div class="btn-plus-fixed"><i class="bi bi-plus-lg"></i></div></button>
-            <button class="nav-item" :class="{active: tab==='chart'}" @click="tab='chart'; selectedPlayer=null"><i class="bi bi-graph-up-arrow"></i></button>
-            <button class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'; selectedPlayer=null"><i class="bi bi-gear-wide-connected"></i></button>
-        </nav>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-    const firebaseConfig = { apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g", authDomain: "mahjongstorage-836e8.firebaseapp.com", projectId: "mahjongstorage-836e8", storageBucket: "mahjongstorage-836e8.firebasestorage.app", messagingSenderId: "618604764916", appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1" };
-    
-    const YAKU_MASTER = [
-        { id: 901, name: 'ドラ', m: 1, f: 1, isDora: true },
-        { id: 902, name: '赤ドラ', m: 1, f: 1, isDora: true },
-        { id: 903, name: '裏ドラ', m: 1, f: 1, isDora: true },
-        { id: 1, name: '立直', m: 1, f: 0 }, { id: 2, name: '断幺九', m: 1, f: 1 }, { id: 3, name: '平和', m: 1, f: 0 }, { id: 4, name: '一発', m: 1, f: 0 },
-        { id: 11, name: '門前自摸', m: 1, f: 0 }, { id: 12, name: '役牌', m: 1, f: 1 }, { id: 13, name: '嶺上開花', m: 1, f: 1 }, { id: 14, name: '海底/河底', m: 1, f: 1 },
-        { id: 5, name: '三色同順', m: 2, f: 1 }, { id: 6, name: '一気通貫', m: 2, f: 1 }, { id: 7, name: '混一色', m: 3, f: 2 }, { id: 8, name: '清一色', m: 6, f: 5 },
-        { id: 9, name: '七対子', m: 2, f: 0, fixedFu: 25 }, { id: 10, name: '対々和', m: 2, f: 2 }, { id: 15, name: '三暗刻', m: 2, f: 2 }, { id: 16, name: '三色同刻', m: 2, f: 2 },
-        { id: 17, name: '混老頭', m: 2, f: 2 }, { id: 18, name: '小三元', m: 2, f: 2 }, { id: 19, name: '純全帯', m: 3, f: 2 }, { id: 20, name: '二盃口', m: 3, f: 0 },
-        { id: 101, name: '大三元', yakuman: true }, { id: 102, name: '四暗刻', yakuman: true }, { id: 103, name: '国士無双', yakuman: true },
-        { id: 105, name: '字一色', yakuman: true }, { id: 106, name: '緑一色', yakuman: true }, { id: 107, name: '清老頭', yakuman: true },
-        { id: 108, name: '小四喜', yakuman: true }, { id: 109, name: '大四喜', yakuman: true, double: true }, { id: 110, name: '四暗刻単騎', yakuman: true, double: true },
-        { id: 111, name: '国士13面', yakuman: true, double: true }, { id: 112, name: '九蓮宝燈', yakuman: true }, { id: 113, name: '純正九蓮', yakuman: true, double: true },
-        { id: 114, name: '天和/地和', yakuman: true },
-        { id: 201, name: '流し満貫', m: 0, f: 0, local: true },
-        { id: 202, name: '人和', yakuman: true, local: true },
-        { id: 203, name: '大車輪', yakuman: true, local: true },
-        { id: 204, name: '大七星', yakuman: true, double: true, local: true }
-    ];
+        const firebaseConfig = { apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g", authDomain: "mahjongstorage-836e8.firebaseapp.com", projectId: "mahjongstorage-836e8", storageBucket: "mahjongstorage-836e8.firebasestorage.app", messagingSenderId: "618604764916", appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1" };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-    const { createApp, ref, computed, watch, nextTick } = Vue;
+        const YAKU_MASTER = [
+            { id: 901, name: 'ドラ', m: 1, f: 1, isDora: true },
+            { id: 902, name: '赤ドラ', m: 1, f: 1, isDora: true },
+            { id: 903, name: '裏ドラ', m: 1, f: 1, isDora: true },
+            { id: 1, name: '立直', m: 1, f: 0 }, { id: 2, name: '断幺九', m: 1, f: 1 }, { id: 3, name: '平和', m: 1, f: 0 }, { id: 4, name: '一発', m: 1, f: 0 },
+            { id: 11, name: '門前自摸', m: 1, f: 0 }, { id: 12, name: '役牌', m: 1, f: 1 }, { id: 13, name: '嶺上開花', m: 1, f: 1 }, { id: 14, name: '海底/河底', m: 1, f: 1 },
+            { id: 5, name: '三色同順', m: 2, f: 1 }, { id: 6, name: '一気通貫', m: 2, f: 1 }, { id: 7, name: '混一色', m: 3, f: 2 }, { id: 8, name: '清一色', m: 6, f: 5 },
+            { id: 9, name: '七対子', m: 2, f: 0, fixedFu: 25 }, { id: 10, name: '対々和', m: 2, f: 2 }, { id: 15, name: '三暗刻', m: 2, f: 2 }, { id: 16, name: '三色同刻', m: 2, f: 2 },
+            { id: 17, name: '混老頭', m: 2, f: 2 }, { id: 18, name: '小三元', m: 2, f: 2 }, { id: 19, name: '純全帯', m: 3, f: 2 }, { id: 20, name: '二盃口', m: 3, f: 0 },
+            { id: 101, name: '大三元', yakuman: true }, { id: 102, name: '四暗刻', yakuman: true }, { id: 103, name: '国士無双', yakuman: true },
+            { id: 105, name: '字一色', yakuman: true }, { id: 106, name: '緑一色', yakuman: true }, { id: 107, name: '清老頭', yakuman: true },
+            { id: 108, name: '小四喜', yakuman: true }, { id: 109, name: '大四喜', yakuman: true, double: true }, { id: 110, name: '四暗刻単騎', yakuman: true, double: true },
+            { id: 111, name: '国士13面', yakuman: true, double: true }, { id: 112, name: '九蓮宝燈', yakuman: true }, { id: 113, name: '純正九蓮', yakuman: true, double: true },
+            { id: 114, name: '天和/地和', yakuman: true },
+            { id: 201, name: '流し満貫', m: 0, f: 0, local: true },
+            { id: 202, name: '人和', yakuman: true, local: true },
+            { id: 203, name: '大車輪', yakuman: true, local: true },
+            { id: 204, name: '大七星', yakuman: true, double: true, local: true }
+        ];
 
-    createApp({
-        setup() {
-            const currentRoomId = ref(null);
-            const authMode = ref('login');
-            const tab = ref('dashboard');
-            const loginForm = ref({ room: '', pass: '' });
-            const games = ref([]); // 直近のゲームリスト (最大100)
-            const masterStats = ref({}); // 集計済み統計データ（DBから取得）
-            const roomConfig = ref({ kaeshi: 30000, oka: 20, uma: '10-20', doubleYakuman: true, kiriage: false, localYaku: false });
-            
-            const toLocalISO = () => {
-                const now = new Date();
-                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-                return now.toISOString().slice(0, 16);
-            };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const { createApp, ref, computed, watch, nextTick } = Vue;
 
-            const inputForm = ref({ players: ['P1','P2','P3','P4'], rawScores: [25000,25000,25000,25000], logs: [], datetime: toLocalISO() });
-            
-            const initHandForm = { 
-                winnerIdx:0, loserIdx:null, isMenzen: true, selectedYaku:[], 
-                ba: 0, kyoku: 1, honba: 0, fu: 30, isWinnerDealer: false,
-                doraCounts: {} 
-            };
-            const handForm = ref({ ...initHandForm });
-            
-            const showHandModal = ref(false);
-            const selectedPlayer = ref(null);
-            const chartMode = ref('top4');
-            let lineChart = null, pieChart = null;
+        createApp({
+            setup() {
+                const currentRoomId = ref(null);
+                const authMode = ref('login');
+                const tab = ref('dashboard');
+                const loginForm = ref({ room: '', pass: '' });
+                const games = ref([]); // 直近のゲームリスト (最大100)
+                const masterStats = ref({}); // 集計済み統計データ（DBから取得）
+                const roomConfig = ref({ kaeshi: 30000, oka: 20, uma: '10-20', doubleYakuman: true, kiriage: false, localYaku: false });
 
-            // --- 統計処理 ---
-            // 従来の games 配列からの計算ではなく、masterStats（永続化された集計データ）を表示用に加工する
-            const displayStats = computed(() => {
-                const s = Object.values(masterStats.value);
-                // データがない場合は空配列
-                if (!s.length) return [];
-                
-                return s.sort((a,b) => b.totalScore - a.totalScore).map(stat => {
-                    const games = stat.games || 0;
-                    const rankCounts = stat.rankCounts || [0,0,0,0]; // [1位回数, 2位, 3位, 4位]
-                    const rankSum = stat.rankSum || 0;
-                    
-                    return {
-                        ...stat,
-                        games,
-                        avgRank: games ? (rankSum / games).toFixed(2) : 0,
-                        avgScorePerGame: games ? (stat.totalScore / games).toFixed(1) : 0,
-                        
-                        // 追加指標
-                        winRate: games ? ((stat.winCount / (games * 10)) * 100).toFixed(1) : 0, // ※和了率等の分母は概算(1半荘10局想定)のまま維持
-                        loseRate: games ? ((stat.loseCount / (games * 10)) * 100).toFixed(1) : 0,
-                        topRate: games ? ((rankCounts[0] / games) * 100).toFixed(1) : 0,
-                        rentaiRate: games ? (((rankCounts[0] + rankCounts[1]) / games) * 100).toFixed(1) : 0,
-                        avoidLastRate: games ? (((games - rankCounts[3]) / games) * 100).toFixed(1) : 0,
-                        
-                        avgHand: stat.totalHands ? Math.round(stat.handSum / stat.totalHands) : 0,
-                        avgLoseScore: stat.loseCount ? Math.round(stat.loseSum / stat.loseCount) : 0,
-                        totalScore: parseFloat(stat.totalScore.toFixed(1)),
-                        yakuMapSorted: stat.yakuMap ? Object.fromEntries(Object.entries(stat.yakuMap).sort(([,a],[,b]) => b-a)) : {}
-                    };
-                });
-            });
-
-            const globalStats = computed(() => {
-                const s = displayStats.value;
-                if (!s.length) return { avgRank:0, avgScore: 0, totalGames: 0 };
-                // 全プレイヤーの対局数の最大値を「総対局数」として扱う（途中参加の人がいるため）
-                const totalGames = Math.max(...s.map(p => p.games));
-                return {
-                    avgRank: (s.reduce((acc, p) => acc + parseFloat(p.avgRank), 0) / s.length).toFixed(2),
-                    avgScore: Math.round(s.reduce((acc, p) => acc + p.avgHand, 0) / s.length),
-                    totalGames
+                const toLocalISO = () => {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    return now.toISOString().slice(0, 16);
                 };
-            });
 
-            // --- 点数計算 (変更なし) ---
-            const calculatedResult = computed(() => {
-                const { selectedYaku, isMenzen, fu, honba, isWinnerDealer, loserIdx, doraCounts } = handForm.value;
-                const isTsumo = loserIdx === null;
-                const conf = roomConfig.value;
+                const inputForm = ref({ players: ['P1', 'P2', 'P3', 'P4'], rawScores: [25000, 25000, 25000, 25000], logs: [], datetime: toLocalISO() });
 
-                let han = 0, yakumanCount = 0;
-                let isNagashi = false;
-                
-                selectedYaku.forEach(id => {
-                    const y = YAKU_MASTER.find(x => x.id === id);
-                    if (!y) return;
-                    if (y.id === 201) isNagashi = true;
-                    else if (y.yakuman) {
-                        if (y.double && conf.doubleYakuman) yakumanCount += 2;
-                        else yakumanCount += 1;
-                    } else if (y.isDora) {
-                        han += (doraCounts[id] || 0);
-                    } else {
-                        han += (isMenzen ? y.m : y.f);
-                    }
-                });
-
-                let basePoints = 0;
-                let text = "";
-
-                if (isNagashi) {
-                    basePoints = 2000; 
-                    text = "流し満貫";
-                } else if (yakumanCount > 0) {
-                    basePoints = 8000 * yakumanCount;
-                    text = yakumanCount > 1 ? `${yakumanCount}倍役満` : "役満";
-                } else {
-                    if (han === 0) return { score: "役なし", text: "役を選択してください" };
-                    let basic = fu * Math.pow(2, 2 + han);
-                    if (conf.kiriage) {
-                        if ((han === 4 && fu === 30) || (han === 3 && fu === 60)) basic = 2000;
-                    }
-                    if (basic >= 2000) {
-                        if (han >= 13) { basePoints = 8000; text = "数え役満"; }
-                        else if (han >= 11) { basePoints = 6000; text = "三倍満"; }
-                        else if (han >= 8) { basePoints = 4000; text = "倍満"; }
-                        else if (han >= 6) { basePoints = 3000; text = "跳満"; }
-                        else { basePoints = 2000; text = "満貫"; }
-                    } else {
-                        basePoints = basic;
-                        text = `${han}翻 ${fu}符`;
-                    }
-                }
-
-                let pay = 0;
-                const honbaPt = honba * 300; 
-
-                if (isTsumo) {
-                    if (isWinnerDealer) {
-                        let unit = Math.ceil((basePoints * 2) / 100) * 100;
-                        pay = (unit * 3) + honbaPt;
-                        text += ` (親ツモ ${unit}オール)`;
-                    } else {
-                        let ko = Math.ceil(basePoints / 100) * 100;
-                        let oya = Math.ceil((basePoints * 2) / 100) * 100;
-                        pay = (ko * 2 + oya) + honbaPt;
-                        text += ` (子ツモ ${ko}/${oya})`;
-                    }
-                } else {
-                    let pt = 0;
-                    if (isWinnerDealer) pt = Math.ceil((basePoints * 6) / 100) * 100;
-                    else pt = Math.ceil((basePoints * 4) / 100) * 100;
-                    pay = pt + honbaPt;
-                }
-                
-                return { score: pay + "点", raw: pay, text };
-            });
-
-            // --- アクション ---
-            const joinRoom = async (mode) => {
-                await signInAnonymously(auth);
-                const roomName = loginForm.value.room;
-                if (!roomName) return;
-                const rRef = doc(db, "rooms", roomName);
-                if (mode === 'create') {
-                    await setDoc(rRef, { h: CryptoJS.SHA256(loginForm.value.pass).toString(), config: roomConfig.value });
-                }
-                const rDoc = await getDoc(rRef);
-                if(rDoc.exists() && rDoc.data().config) {
-                    roomConfig.value = { ...roomConfig.value, ...rDoc.data().config };
-                }
-                currentRoomId.value = roomName;
-                
-                // 1. 対局ログ取得（直近100件）
-                const gameSnap = await getDocs(query(collection(db, "rooms", roomName, "g"), orderBy("d", "desc"), limit(100)));
-                games.value = gameSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-                // 2. 集計済み統計データ取得
-                const statsSnap = await getDoc(doc(db, "rooms", roomName, "data", "stats"));
-                if (statsSnap.exists()) {
-                    masterStats.value = statsSnap.data();
-                } else {
-                    // 移行処置: 統計データが無い場合は、ロードしたゲームログから統計を作成する
-                    // (初めてこのバージョンを使う場合用)
-                    rebuildStatsFromLoadedGames();
-                }
-            };
-            
-            // 初回移行用：ロード済みgamesからmasterStatsを生成
-            const rebuildStatsFromLoadedGames = () => {
-                const stats = {};
-                games.value.forEach(g => updateStatsObject(stats, g));
-                masterStats.value = stats;
-            };
-
-            // 統計オブジェクトを更新するヘルパー関数
-            const updateStatsObject = (statsObj, g) => {
-                // 順位
-                const ranked = g.p.map((p,i) => ({name:p, s:g.s[i]})).sort((a,b) => b.s - a.s);
-                
-                g.p.forEach((name, idx) => {
-                    if (!statsObj[name]) statsObj[name] = { 
-                        name, games:0, totalScore:0, 
-                        winCount:0, loseCount:0, 
-                        totalHands:0, handSum:0, loseSum:0, 
-                        maxHand: 0, maxLose: 0,
-                        rankSum: 0, rankCounts: [0,0,0,0], // [1st, 2nd, 3rd, 4th]
-                        yakuMap:{} 
-                    };
-                    const s = statsObj[name];
-                    s.games++;
-                    s.totalScore += g.s[idx];
-                    
-                    const rank = ranked.findIndex(r => r.name === name); // 0-based index
-                    s.rankSum += (rank + 1);
-                    if(s.rankCounts[rank] !== undefined) s.rankCounts[rank]++;
-                });
-
-                if (g.l) g.l.forEach(log => {
-                    const w = g.p[log.w];
-                    if (statsObj[w]) {
-                        statsObj[w].winCount++; 
-                        statsObj[w].handSum += log.sc; 
-                        statsObj[w].totalHands++;
-                        if(log.sc > statsObj[w].maxHand) statsObj[w].maxHand = log.sc;
-                        log.y?.forEach(yid => {
-                            const y = YAKU_MASTER.find(x => x.id === yid);
-                            if(y && !y.isDora) { 
-                                const yn = y.name;
-                                statsObj[w].yakuMap[yn] = (statsObj[w].yakuMap[yn] || 0) + 1;
-                            }
-                        });
-                    }
-                    if (log.ls !== null && log.ls !== undefined) {
-                        const l = g.p[log.ls];
-                        if (statsObj[l]) { 
-                            statsObj[l].loseCount++; 
-                            statsObj[l].loseSum += log.sc;
-                            if(log.sc > statsObj[l].maxLose) statsObj[l].maxLose = log.sc;
-                        }
-                    }
-                });
-            };
-
-            const saveGame = async () => {
-                if(!confirm("結果を保存しますか？")) return;
-                
-                let umaStr = roomConfig.value.uma || "10-20";
-                let u = [0,0,0,0];
-                if (umaStr.includes(',')) {
-                    const parts = umaStr.split(',').map(s => parseFloat(s.trim()));
-                    if (parts.length === 4) u = parts;
-                } else {
-                    const parts = umaStr.split('-').map(Number);
-                    if (parts.length === 2 && !isNaN(parts[0])) {
-                        u[0] = parts[1]; u[1] = parts[0]; u[2] = -parts[0]; u[3] = -parts[1];
-                    }
-                }
-
-                const ranked = inputForm.value.rawScores.map((s, i) => ({ s, i })).sort((a,b) => b.s - a.s);
-                const finalS = new Array(4).fill(0);
-                const kaeshi = roomConfig.value.kaeshi;
-                
-                ranked.forEach((r, rank) => {
-                    let pt = (r.s - kaeshi) / 1000; 
-                    pt += u[rank];
-                    if (rank === 0) pt += (roomConfig.value.oka || 0);
-                    finalS[r.i] = Math.round(pt*10)/10;
-                });
-                
-                const gameDate = new Date(inputForm.value.datetime).getTime();
-                const newGameData = { 
-                    d: gameDate, 
-                    p:inputForm.value.players, 
-                    s:finalS, 
-                    l:inputForm.value.logs, 
-                    config: roomConfig.value 
+                const initHandForm = {
+                    winnerIdx: 0, loserIdx: null, isMenzen: true, selectedYaku: [],
+                    ba: 0, kyoku: 1, honba: 0, fu: 30, isWinnerDealer: false,
+                    doraCounts: {}
                 };
-                
-                try {
-                    // 1. masterStats を更新 (ローカル変数を更新)
-                    updateStatsObject(masterStats.value, newGameData);
-                    
-                    // 2. DBへ保存 (Stats と GameData を並行して書き込み)
-                    const statsRef = doc(db, "rooms", currentRoomId.value, "data", "stats");
-                    const gameCollRef = collection(db, "rooms", currentRoomId.value, "g");
-                    
-                    await Promise.all([
-                        setDoc(statsRef, masterStats.value),
-                        addDoc(gameCollRef, newGameData)
-                    ]);
+                const handForm = ref({ ...initHandForm });
 
-                    // 3. ローカルの games 配列を更新
-                    games.value.unshift(newGameData);
-                    games.value.sort((a,b) => b.d - a.d);
+                const showHandModal = ref(false);
+                const selectedPlayer = ref(null);
+                const chartMode = ref('top4');
+                let lineChart = null, pieChart = null;
 
-                    // 4. データ圧縮 (古いデータを削除)
-                    if (games.value.length > 100) {
-                        // DB上の古いデータを検索して削除
-                        // ※ games.valueは既にソートされているが、確実を期すためDBクエリを実行
-                        const oldDocsSnap = await getDocs(query(gameCollRef, orderBy("d", "asc"), limit(games.value.length - 100)));
-                        const deletePromises = oldDocsSnap.docs.map(d => deleteDoc(d.ref));
-                        await Promise.all(deletePromises);
+                // --- 統計処理 ---
+                // 従来の games 配列からの計算ではなく、masterStats（永続化された集計データ）を表示用に加工する
+                const displayStats = computed(() => {
+                    const s = Object.values(masterStats.value);
+                    // データがない場合は空配列
+                    if (!s.length) return [];
 
-                        // ローカル配列も100件にトリミング
-                        games.value = games.value.slice(0, 100);
-                    }
+                    return s.sort((a, b) => b.totalScore - a.totalScore).map(stat => {
+                        const games = stat.games || 0;
+                        const rankCounts = stat.rankCounts || [0, 0, 0, 0]; // [1位回数, 2位, 3位, 4位]
+                        const rankSum = stat.rankSum || 0;
 
-                    resetInput();
-                    tab.value = 'dashboard';
-                } catch(e) {
-                    console.error(e);
-                    alert("保存に失敗しました");
-                }
-            };
+                        return {
+                            ...stat,
+                            games,
+                            avgRank: games ? (rankSum / games).toFixed(2) : 0,
+                            avgScorePerGame: games ? (stat.totalScore / games).toFixed(1) : 0,
 
-            const resetInput = () => {
-                 inputForm.value.logs = [];
-                 inputForm.value.rawScores = [25000,25000,25000,25000];
-                 inputForm.value.datetime = toLocalISO();
-            };
+                            // 追加指標
+                            winRate: games ? ((stat.winCount / (games * 10)) * 100).toFixed(1) : 0, // ※和了率等の分母は概算(1半荘10局想定)のまま維持
+                            loseRate: games ? ((stat.loseCount / (games * 10)) * 100).toFixed(1) : 0,
+                            topRate: games ? ((rankCounts[0] / games) * 100).toFixed(1) : 0,
+                            rentaiRate: games ? (((rankCounts[0] + rankCounts[1]) / games) * 100).toFixed(1) : 0,
+                            avoidLastRate: games ? (((games - rankCounts[3]) / games) * 100).toFixed(1) : 0,
 
-            const addHandLog = () => {
-                const res = calculatedResult.value;
-                if(typeof res.raw !== 'number') return;
-                
-                const { winnerIdx, loserIdx, ba, kyoku, honba } = handForm.value;
-                const baName = ['東','南','西'][ba];
-                const roundName = `${baName}${kyoku}局 ${honba}本場`;
-                
-                const log = {
-                    roundName,
-                    w: winnerIdx,
-                    ls: loserIdx,
-                    winner: inputForm.value.players[winnerIdx],
-                    loser: loserIdx !== null ? inputForm.value.players[loserIdx] : null,
-                    score: res.raw,
-                    sc: res.raw, 
-                    y: handForm.value.selectedYaku
-                };
-                inputForm.value.logs.push(log);
-                showHandModal.value = false;
-            };
-
-            const openHandModal = () => {
-                handForm.value.selectedYaku = [];
-                handForm.value.doraCounts = {};
-                showHandModal.value = true;
-            };
-
-            const toggleYaku = (y) => {
-                const i = handForm.value.selectedYaku.indexOf(y.id);
-                if (i > -1) {
-                    handForm.value.selectedYaku.splice(i,1); 
-                } else {
-                    handForm.value.selectedYaku.push(y.id);
-                    if(y.fixedFu) handForm.value.fu = y.fixedFu;
-                    if(y.isDora && !handForm.value.doraCounts[y.id]) {
-                        handForm.value.doraCounts[y.id] = 1;
-                    }
-                }
-            };
-
-            const changeDoraCount = (id, delta) => {
-                if(!handForm.value.doraCounts[id]) handForm.value.doraCounts[id] = 0;
-                const newVal = handForm.value.doraCounts[id] + delta;
-                if (newVal >= 1) handForm.value.doraCounts[id] = newVal;
-                else {
-                    const i = handForm.value.selectedYaku.indexOf(id);
-                    if(i > -1) handForm.value.selectedYaku.splice(i, 1);
-                }
-            };
-            
-            const filteredYaku = computed(() => {
-                return YAKU_MASTER.filter(y => {
-                    if (y.isDora) return true;
-                    return roomConfig.value.localYaku || !y.local;
-                });
-            });
-
-            const canSelectYaku = (y) => {
-                if(y.isDora) return true;
-                return handForm.value.isMenzen ? true : (y.f > 0 || y.yakuman || y.id === 201);
-            };
-
-            const renderLineChart = () => {
-                const ctx = document.getElementById('scoreChart');
-                if (!ctx) return;
-                if (lineChart) lineChart.destroy();
-                // グラフは「直近のゲーム（games）」のみを使用する
-                // displayStatsは全期間なので、ここではgamesから動的にstatsを作る
-                const tempStats = {}; 
-                const reversedGames = games.value.slice().reverse();
-                
-                // チャート用のデータ構築
-                reversedGames.forEach(g => {
-                     g.p.forEach(pName => {
-                         if(!tempStats[pName]) tempStats[pName] = 0;
-                     });
-                });
-                
-                // 上位選定のために現在のスコア計算
-                const currentScores = {};
-                reversedGames.forEach(g => {
-                    g.p.forEach((p, i) => {
-                        currentScores[p] = (currentScores[p] || 0) + g.s[i];
+                            avgHand: stat.totalHands ? Math.round(stat.handSum / stat.totalHands) : 0,
+                            avgLoseScore: stat.loseCount ? Math.round(stat.loseSum / stat.loseCount) : 0,
+                            totalScore: parseFloat(stat.totalScore.toFixed(1)),
+                            yakuMapSorted: stat.yakuMap ? Object.fromEntries(Object.entries(stat.yakuMap).sort(([, a], [, b]) => b - a)) : {}
+                        };
                     });
                 });
-                
-                let targetPlayers = Object.keys(tempStats);
-                if (chartMode.value === 'top4') {
-                    targetPlayers = targetPlayers.sort((a,b) => currentScores[b] - currentScores[a]).slice(0, 4);
-                }
 
-                lineChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: reversedGames.map((_, i) => i + 1),
-                        datasets: targetPlayers.map((p, i) => ({
-                            label: p,
-                            data: reversedGames.reduce((acc, g) => {
-                                const idx = g.p.indexOf(p);
-                                const last = acc.length ? acc[acc.length-1] : 0;
-                                acc.push(idx > -1 ? last + g.s[idx] : last);
-                                return acc;
-                            }, []),
-                            borderColor: ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6', '#6366f1'][i % 6],
-                            tension: 0.3
-                        }))
-                    },
-                    options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false } }
+                const globalStats = computed(() => {
+                    const s = displayStats.value;
+                    if (!s.length) return { avgRank: 0, avgScore: 0, totalGames: 0 };
+                    // 全プレイヤーの対局数の最大値を「総対局数」として扱う（途中参加の人がいるため）
+                    const totalGames = Math.max(...s.map(p => p.games));
+                    return {
+                        avgRank: (s.reduce((acc, p) => acc + parseFloat(p.avgRank), 0) / s.length).toFixed(2),
+                        avgScore: Math.round(s.reduce((acc, p) => acc + p.avgHand, 0) / s.length),
+                        totalGames
+                    };
                 });
-            };
 
-            const renderPieChart = (p) => {
-                const ctx = document.getElementById('yakuPieChart');
-                if (!ctx || pieChart) pieChart?.destroy();
-                pieChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(p.yakuMapSorted).slice(0, 5),
-                        datasets: [{ data: Object.values(p.yakuMapSorted).slice(0, 5), backgroundColor: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'] }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
+                // 登録済みプレイヤー名一覧（stats に存在するプレイヤー名をソートして返す）
+                const registeredPlayers = computed(() => {
+                    return Object.keys(masterStats.value).sort((a, b) => a.localeCompare(b, 'ja'));
                 });
-            };
 
-            watch([tab, chartMode], () => { if (tab.value === 'chart') nextTick(() => setTimeout(renderLineChart, 200)); });
-            
-            return {
-                currentRoomId, authMode, tab, loginForm, games, roomConfig, displayStats, globalStats, inputForm, handForm, showHandModal, selectedPlayer, chartMode,
-                joinRoom, saveGame, toggleYaku, changeDoraCount, resetInput, filteredYaku, calculatedResult, canSelectYaku, addHandLog, openHandModal,
-                openPlayerDetail: (p) => { selectedPlayer.value = p; nextTick(() => setTimeout(() => renderPieChart(p), 200)); },
-                formatDate: (ts) => new Date(ts).toLocaleDateString(),
-                logout: () => location.reload()
-            };
-        }
-    }).mount('#app');
-</script>
+                // --- 点数計算 (変更なし) ---
+                const calculatedResult = computed(() => {
+                    const { selectedYaku, isMenzen, fu, honba, isWinnerDealer, loserIdx, doraCounts } = handForm.value;
+                    const isTsumo = loserIdx === null;
+                    const conf = roomConfig.value;
+
+                    let han = 0, yakumanCount = 0;
+                    let isNagashi = false;
+
+                    selectedYaku.forEach(id => {
+                        const y = YAKU_MASTER.find(x => x.id === id);
+                        if (!y) return;
+                        if (y.id === 201) isNagashi = true;
+                        else if (y.yakuman) {
+                            if (y.double && conf.doubleYakuman) yakumanCount += 2;
+                            else yakumanCount += 1;
+                        } else if (y.isDora) {
+                            han += (doraCounts[id] || 0);
+                        } else {
+                            han += (isMenzen ? y.m : y.f);
+                        }
+                    });
+
+                    let basePoints = 0;
+                    let text = "";
+
+                    if (isNagashi) {
+                        basePoints = 2000;
+                        text = "流し満貫";
+                    } else if (yakumanCount > 0) {
+                        basePoints = 8000 * yakumanCount;
+                        text = yakumanCount > 1 ? `${yakumanCount}倍役満` : "役満";
+                    } else {
+                        if (han === 0) return { score: "役なし", text: "役を選択してください" };
+                        let basic = fu * Math.pow(2, 2 + han);
+                        if (conf.kiriage) {
+                            if ((han === 4 && fu === 30) || (han === 3 && fu === 60)) basic = 2000;
+                        }
+                        if (basic >= 2000) {
+                            if (han >= 13) { basePoints = 8000; text = "数え役満"; }
+                            else if (han >= 11) { basePoints = 6000; text = "三倍満"; }
+                            else if (han >= 8) { basePoints = 4000; text = "倍満"; }
+                            else if (han >= 6) { basePoints = 3000; text = "跳満"; }
+                            else { basePoints = 2000; text = "満貫"; }
+                        } else {
+                            basePoints = basic;
+                            text = `${han}翻 ${fu}符`;
+                        }
+                    }
+
+                    let pay = 0;
+                    const honbaPt = honba * 300;
+
+                    if (isTsumo) {
+                        if (isWinnerDealer) {
+                            let unit = Math.ceil((basePoints * 2) / 100) * 100;
+                            pay = (unit * 3) + honbaPt;
+                            text += ` (親ツモ ${unit}オール)`;
+                        } else {
+                            let ko = Math.ceil(basePoints / 100) * 100;
+                            let oya = Math.ceil((basePoints * 2) / 100) * 100;
+                            pay = (ko * 2 + oya) + honbaPt;
+                            text += ` (子ツモ ${ko}/${oya})`;
+                        }
+                    } else {
+                        let pt = 0;
+                        if (isWinnerDealer) pt = Math.ceil((basePoints * 6) / 100) * 100;
+                        else pt = Math.ceil((basePoints * 4) / 100) * 100;
+                        pay = pt + honbaPt;
+                    }
+
+                    return { score: pay + "点", raw: pay, text };
+                });
+
+                // --- アクション ---
+                const joinRoom = async (mode) => {
+                    await signInAnonymously(auth);
+                    const roomName = loginForm.value.room;
+                    if (!roomName) return;
+                    const rRef = doc(db, "rooms", roomName);
+                    const statsRef = doc(db, "rooms", roomName, "data", "stats");
+
+                    if (mode === 'create') {
+                        // 部屋作成時：room info と 空の stats を同時に作成（競合対策: merge使用）
+                        await Promise.all([
+                            setDoc(rRef, { h: CryptoJS.SHA256(loginForm.value.pass).toString(), config: roomConfig.value }, { merge: true }),
+                            setDoc(statsRef, {}, { merge: true }) // 空でも作成しておく
+                        ]);
+                    }
+
+                    const rDoc = await getDoc(rRef);
+                    if (!rDoc.exists()) {
+                        alert('部屋が見つかりません');
+                        return;
+                    }
+                    if (rDoc.data().config) {
+                        roomConfig.value = { ...roomConfig.value, ...rDoc.data().config };
+                    }
+                    currentRoomId.value = roomName;
+
+                    // 1. 対局ログ取得（直近100件）
+                    const gameSnap = await getDocs(query(collection(db, "rooms", roomName, "g"), orderBy("d", "desc"), limit(100)));
+                    games.value = gameSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                    // 2. 集計済み統計データ取得（存在しなければ自動作成）
+                    const statsSnap = await getDoc(statsRef);
+                    if (statsSnap.exists() && Object.keys(statsSnap.data()).length > 0) {
+                        masterStats.value = statsSnap.data();
+                        // 3. データ整合性チェック＆自動修復
+                        await validateAndRepairStats();
+                    } else {
+                        // statsが存在しない/空の場合：ゲームログから統計を再構築して保存
+                        // 競合対策: mergeオプションを使用
+                        await rebuildStatsFromLoadedGames();
+                    }
+                };
+
+                // データ整合性チェック＆自動修復関数
+                // ※ stats を基本（権威あるデータ）として扱い、内部的な矛盾のみを修正
+                // ※ games は直近100件のログであり、stats の全履歴とは一致しない前提
+                const validateAndRepairStats = async () => {
+                    let needsSave = false;
+                    const repairs = [];
+
+                    for (const name of Object.keys(masterStats.value)) {
+                        const s = masterStats.value[name];
+
+                        // 1. 必須フィールドの欠落を補完
+                        const defaults = {
+                            name, games: 0, totalScore: 0,
+                            winCount: 0, loseCount: 0,
+                            totalHands: 0, handSum: 0, loseSum: 0,
+                            maxHand: 0, maxLose: 0,
+                            rankSum: 0, rankCounts: [0, 0, 0, 0],
+                            yakuMap: {}
+                        };
+                        for (const key of Object.keys(defaults)) {
+                            if (s[key] === undefined || s[key] === null) {
+                                s[key] = defaults[key];
+                                repairs.push(`${name}: フィールド "${key}" を初期化`);
+                                needsSave = true;
+                            }
+                        }
+
+                        // 2. 負の値チェック（対局数、和了数等は負になりえない）
+                        const nonNegativeFields = ['games', 'winCount', 'loseCount', 'totalHands', 'handSum', 'maxHand'];
+                        for (const field of nonNegativeFields) {
+                            if (typeof s[field] === 'number' && s[field] < 0) {
+                                repairs.push(`${name}: ${field} が負(${s[field]})のため0に修正`);
+                                s[field] = 0;
+                                needsSave = true;
+                            }
+                        }
+
+                        // 3. rankCounts の内部整合性チェック
+                        if (!Array.isArray(s.rankCounts) || s.rankCounts.length !== 4) {
+                            repairs.push(`${name}: rankCounts の形式が不正のため初期化`);
+                            s.rankCounts = [0, 0, 0, 0];
+                            needsSave = true;
+                        } else {
+                            // 各要素が負でないかチェック
+                            for (let i = 0; i < 4; i++) {
+                                if (typeof s.rankCounts[i] !== 'number' || s.rankCounts[i] < 0) {
+                                    repairs.push(`${name}: rankCounts[${i}] が不正(${s.rankCounts[i]})のため0に修正`);
+                                    s.rankCounts[i] = 0;
+                                    needsSave = true;
+                                }
+                            }
+                        }
+
+                        // 4. rankCounts合計 と games の整合性チェック
+                        // ※ 合計がgamesより大きい場合のみ修正（小さい場合は過去データ削除の可能性）
+                        const rankSum = s.rankCounts.reduce((a, b) => a + b, 0);
+                        if (rankSum > s.games && s.games > 0) {
+                            repairs.push(`${name}: rankCounts合計(${rankSum}) > games(${s.games})のため、gamesをrankCounts合計に修正`);
+                            s.games = rankSum;
+                            needsSave = true;
+                        }
+                        // rankSum が合わない場合、rankSum を再計算して設定
+                        if (s.rankSum !== undefined && typeof s.rankSum === 'number') {
+                            const expectedRankSum = s.rankCounts.reduce((acc, cnt, idx) => acc + cnt * (idx + 1), 0);
+                            if (Math.abs(s.rankSum - expectedRankSum) > 0.01 && rankSum > 0) {
+                                repairs.push(`${name}: rankSum(${s.rankSum})を期待値(${expectedRankSum})に修正`);
+                                s.rankSum = expectedRankSum;
+                                needsSave = true;
+                            }
+                        }
+
+                        // 5. yakuMap の整合性チェック（負のカウントを修正）
+                        if (s.yakuMap && typeof s.yakuMap === 'object') {
+                            for (const [yaku, count] of Object.entries(s.yakuMap)) {
+                                if (typeof count !== 'number' || count < 0) {
+                                    repairs.push(`${name}: yakuMap[${yaku}] が不正(${count})のため削除`);
+                                    delete s.yakuMap[yaku];
+                                    needsSave = true;
+                                }
+                            }
+                        }
+                    }
+
+                    // 修復が必要な場合はDBに保存
+                    if (needsSave) {
+                        console.warn('データ整合性修復を実行:', repairs);
+
+                        if (currentRoomId.value) {
+                            const statsRef = doc(db, "rooms", currentRoomId.value, "data", "stats");
+                            try {
+                                await setDoc(statsRef, masterStats.value, { merge: true });
+                                console.log('データ整合性修復完了');
+                            } catch (e) {
+                                console.error('データ修復保存失敗:', e);
+                            }
+                        }
+                    } else {
+                        console.log('データ整合性チェックOK');
+                    }
+                };
+
+                // 初回移行用：ロード済みgamesからmasterStatsを生成してDBに保存
+                const rebuildStatsFromLoadedGames = async () => {
+                    const stats = {};
+                    games.value.forEach(g => updateStatsObject(stats, g));
+                    masterStats.value = stats;
+
+                    // DBに永続化（競合対策: mergeオプション使用）
+                    if (currentRoomId.value) {
+                        const statsRef = doc(db, "rooms", currentRoomId.value, "data", "stats");
+                        try {
+                            await setDoc(statsRef, stats, { merge: true });
+                        } catch (e) {
+                            console.warn('Stats save failed (may be race condition, will retry on next save):', e);
+                        }
+                    }
+                };
+
+                // 統計オブジェクトを更新するヘルパー関数
+                const updateStatsObject = (statsObj, g) => {
+                    // 順位
+                    const ranked = g.p.map((p, i) => ({ name: p, s: g.s[i] })).sort((a, b) => b.s - a.s);
+
+                    g.p.forEach((name, idx) => {
+                        if (!statsObj[name]) statsObj[name] = {
+                            name, games: 0, totalScore: 0,
+                            winCount: 0, loseCount: 0,
+                            totalHands: 0, handSum: 0, loseSum: 0,
+                            maxHand: 0, maxLose: 0,
+                            rankSum: 0, rankCounts: [0, 0, 0, 0], // [1st, 2nd, 3rd, 4th]
+                            yakuMap: {}
+                        };
+                        const s = statsObj[name];
+                        s.games++;
+                        s.totalScore += g.s[idx];
+
+                        const rank = ranked.findIndex(r => r.name === name); // 0-based index
+                        s.rankSum += (rank + 1);
+                        if (s.rankCounts[rank] !== undefined) s.rankCounts[rank]++;
+                    });
+
+                    if (g.l) g.l.forEach(log => {
+                        const w = g.p[log.w];
+                        if (statsObj[w]) {
+                            statsObj[w].winCount++;
+                            statsObj[w].handSum += log.sc;
+                            statsObj[w].totalHands++;
+                            if (log.sc > statsObj[w].maxHand) statsObj[w].maxHand = log.sc;
+                            log.y?.forEach(yid => {
+                                const y = YAKU_MASTER.find(x => x.id === yid);
+                                if (y && !y.isDora) {
+                                    const yn = y.name;
+                                    statsObj[w].yakuMap[yn] = (statsObj[w].yakuMap[yn] || 0) + 1;
+                                }
+                            });
+                        }
+                        if (log.ls !== null && log.ls !== undefined) {
+                            const l = g.p[log.ls];
+                            if (statsObj[l]) {
+                                statsObj[l].loseCount++;
+                                statsObj[l].loseSum += log.sc;
+                                if (log.sc > statsObj[l].maxLose) statsObj[l].maxLose = log.sc;
+                            }
+                        }
+                    });
+                };
+
+                const saveGame = async () => {
+                    if (!confirm("結果を保存しますか？")) return;
+
+                    let umaStr = roomConfig.value.uma || "10-20";
+                    let u = [0, 0, 0, 0];
+                    if (umaStr.includes(',')) {
+                        const parts = umaStr.split(',').map(s => parseFloat(s.trim()));
+                        if (parts.length === 4) u = parts;
+                    } else {
+                        const parts = umaStr.split('-').map(Number);
+                        if (parts.length === 2 && !isNaN(parts[0])) {
+                            u[0] = parts[1]; u[1] = parts[0]; u[2] = -parts[0]; u[3] = -parts[1];
+                        }
+                    }
+
+                    const ranked = inputForm.value.rawScores.map((s, i) => ({ s, i })).sort((a, b) => b.s - a.s);
+                    const finalS = new Array(4).fill(0);
+                    const kaeshi = roomConfig.value.kaeshi;
+
+                    ranked.forEach((r, rank) => {
+                        let pt = (r.s - kaeshi) / 1000;
+                        pt += u[rank];
+                        if (rank === 0) pt += (roomConfig.value.oka || 0);
+                        finalS[r.i] = Math.round(pt * 10) / 10;
+                    });
+
+                    const gameDate = new Date(inputForm.value.datetime).getTime();
+                    const newGameData = {
+                        d: gameDate,
+                        p: inputForm.value.players,
+                        s: finalS,
+                        l: inputForm.value.logs,
+                        config: roomConfig.value
+                    };
+
+                    try {
+                        // 1. masterStats を更新 (ローカル変数を更新)
+                        updateStatsObject(masterStats.value, newGameData);
+
+                        // 2. DBへ保存 (Stats と GameData を並行して書き込み)
+                        // 競合対策: statsはmergeオプション使用で部分更新
+                        const statsRef = doc(db, "rooms", currentRoomId.value, "data", "stats");
+                        const gameCollRef = collection(db, "rooms", currentRoomId.value, "g");
+
+                        await Promise.all([
+                            setDoc(statsRef, masterStats.value, { merge: true }),
+                            addDoc(gameCollRef, newGameData)
+                        ]);
+
+                        // 3. ローカルの games 配列を更新
+                        games.value.unshift(newGameData);
+                        games.value.sort((a, b) => b.d - a.d);
+
+                        // 4. データ圧縮 (古いデータを削除)
+                        if (games.value.length > 100) {
+                            // DB上の古いデータを検索して削除
+                            // ※ games.valueは既にソートされているが、確実を期すためDBクエリを実行
+                            const oldDocsSnap = await getDocs(query(gameCollRef, orderBy("d", "asc"), limit(games.value.length - 100)));
+                            const deletePromises = oldDocsSnap.docs.map(d => deleteDoc(d.ref));
+                            await Promise.all(deletePromises);
+
+                            // ローカル配列も100件にトリミング
+                            games.value = games.value.slice(0, 100);
+                        }
+
+                        resetInput();
+                        tab.value = 'dashboard';
+                    } catch (e) {
+                        console.error(e);
+                        alert("保存に失敗しました");
+                    }
+                };
+
+                const resetInput = () => {
+                    inputForm.value.logs = [];
+                    inputForm.value.rawScores = [25000, 25000, 25000, 25000];
+                    inputForm.value.datetime = toLocalISO();
+                };
+
+                const addHandLog = () => {
+                    const res = calculatedResult.value;
+                    if (typeof res.raw !== 'number') return;
+
+                    const { winnerIdx, loserIdx, ba, kyoku, honba } = handForm.value;
+                    const baName = ['東', '南', '西'][ba];
+                    const roundName = `${baName}${kyoku}局 ${honba}本場`;
+
+                    const log = {
+                        roundName,
+                        w: winnerIdx,
+                        ls: loserIdx,
+                        winner: inputForm.value.players[winnerIdx],
+                        loser: loserIdx !== null ? inputForm.value.players[loserIdx] : null,
+                        score: res.raw,
+                        sc: res.raw,
+                        y: handForm.value.selectedYaku
+                    };
+                    inputForm.value.logs.push(log);
+                    showHandModal.value = false;
+                };
+
+                const openHandModal = () => {
+                    handForm.value.selectedYaku = [];
+                    handForm.value.doraCounts = {};
+                    showHandModal.value = true;
+                };
+
+                const toggleYaku = (y) => {
+                    const i = handForm.value.selectedYaku.indexOf(y.id);
+                    if (i > -1) {
+                        handForm.value.selectedYaku.splice(i, 1);
+                    } else {
+                        handForm.value.selectedYaku.push(y.id);
+                        if (y.fixedFu) handForm.value.fu = y.fixedFu;
+                        if (y.isDora && !handForm.value.doraCounts[y.id]) {
+                            handForm.value.doraCounts[y.id] = 1;
+                        }
+                    }
+                };
+
+                const changeDoraCount = (id, delta) => {
+                    if (!handForm.value.doraCounts[id]) handForm.value.doraCounts[id] = 0;
+                    const newVal = handForm.value.doraCounts[id] + delta;
+                    if (newVal >= 1) handForm.value.doraCounts[id] = newVal;
+                    else {
+                        const i = handForm.value.selectedYaku.indexOf(id);
+                        if (i > -1) handForm.value.selectedYaku.splice(i, 1);
+                    }
+                };
+
+                const filteredYaku = computed(() => {
+                    return YAKU_MASTER.filter(y => {
+                        if (y.isDora) return true;
+                        return roomConfig.value.localYaku || !y.local;
+                    });
+                });
+
+                const canSelectYaku = (y) => {
+                    if (y.isDora) return true;
+                    return handForm.value.isMenzen ? true : (y.f > 0 || y.yakuman || y.id === 201);
+                };
+
+                const renderLineChart = () => {
+                    const ctx = document.getElementById('scoreChart');
+                    if (!ctx) return;
+                    if (lineChart) lineChart.destroy();
+                    // グラフは「直近のゲーム（games）」のみを使用する
+                    // displayStatsは全期間なので、ここではgamesから動的にstatsを作る
+                    const tempStats = {};
+                    const reversedGames = games.value.slice().reverse();
+
+                    // チャート用のデータ構築
+                    reversedGames.forEach(g => {
+                        g.p.forEach(pName => {
+                            if (!tempStats[pName]) tempStats[pName] = 0;
+                        });
+                    });
+
+                    // 上位選定のために現在のスコア計算
+                    const currentScores = {};
+                    reversedGames.forEach(g => {
+                        g.p.forEach((p, i) => {
+                            currentScores[p] = (currentScores[p] || 0) + g.s[i];
+                        });
+                    });
+
+                    let targetPlayers = Object.keys(tempStats);
+                    if (chartMode.value === 'top4') {
+                        targetPlayers = targetPlayers.sort((a, b) => currentScores[b] - currentScores[a]).slice(0, 4);
+                    }
+
+                    lineChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: reversedGames.map((_, i) => i + 1),
+                            datasets: targetPlayers.map((p, i) => ({
+                                label: p,
+                                data: reversedGames.reduce((acc, g) => {
+                                    const idx = g.p.indexOf(p);
+                                    const last = acc.length ? acc[acc.length - 1] : 0;
+                                    acc.push(idx > -1 ? last + g.s[idx] : last);
+                                    return acc;
+                                }, []),
+                                borderColor: ['#10b981', '#f43f5e', '#f59e0b', '#3b82f6', '#8b5cf6', '#6366f1'][i % 6],
+                                tension: 0.3
+                            }))
+                        },
+                        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false } }
+                    });
+                };
+
+                const renderPieChart = (p) => {
+                    const ctx = document.getElementById('yakuPieChart');
+                    if (!ctx || pieChart) pieChart?.destroy();
+                    pieChart = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: Object.keys(p.yakuMapSorted).slice(0, 5),
+                            datasets: [{ data: Object.values(p.yakuMapSorted).slice(0, 5), backgroundColor: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'] }]
+                        },
+                        options: { responsive: true, maintainAspectRatio: false }
+                    });
+                };
+
+                watch([tab, chartMode], () => { if (tab.value === 'chart') nextTick(() => setTimeout(renderLineChart, 200)); });
+
+                return {
+                    currentRoomId, authMode, tab, loginForm, games, roomConfig, displayStats, globalStats, inputForm, handForm, showHandModal, selectedPlayer, chartMode, registeredPlayers,
+                    joinRoom, saveGame, toggleYaku, changeDoraCount, resetInput, filteredYaku, calculatedResult, canSelectYaku, addHandLog, openHandModal,
+                    openPlayerDetail: (p) => { selectedPlayer.value = p; nextTick(() => setTimeout(() => renderPieChart(p), 200)); },
+                    formatDate: (ts) => new Date(ts).toLocaleDateString(),
+                    logout: () => location.reload()
+                };
+            }
+        }).mount('#app');
+    </script>
 </body>
+
 </html>
