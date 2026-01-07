@@ -209,7 +209,7 @@
 <body>
 
     <div id="app" v-cloak>
-        <div class="version-info">v1.6.1</div>
+        <div class="version-info">v1.6.2</div>
         <div v-if="!currentRoomId" class="container d-flex justify-content-center align-items-center"
             style="min-height: 100vh;">
             <div class="text-center w-100 px-4" style="max-width: 400px;">
@@ -832,11 +832,25 @@
                 const joinRoom = async (mode) => {
                     await signInAnonymously(auth);
                     const roomName = loginForm.value.room;
-                    if (!roomName) return;
+                    if (!roomName) {
+                        alert('グループIDを入力してください');
+                        return;
+                    }
+                    if (!loginForm.value.pass) {
+                        alert('合言葉を入力してください');
+                        return;
+                    }
+
                     const rRef = doc(db, "rooms", roomName);
                     const statsRef = doc(db, "rooms", roomName, "data", "stats");
 
                     if (mode === 'create') {
+                        // 既に同じ名前の部屋が存在するかチェック
+                        const existingRoom = await getDoc(rRef);
+                        if (existingRoom.exists()) {
+                            alert('このグループIDは既に使用されています。別のIDを入力するか、入室を選択してください。');
+                            return;
+                        }
                         // 部屋作成時：room info と 空の stats を同時に作成（競合対策: merge使用）
                         await Promise.all([
                             setDoc(rRef, { h: CryptoJS.SHA256(loginForm.value.pass).toString(), config: roomConfig.value }, { merge: true }),
@@ -846,9 +860,20 @@
 
                     const rDoc = await getDoc(rRef);
                     if (!rDoc.exists()) {
-                        alert('部屋が見つかりません');
+                        alert('指定されたグループIDの部屋が見つかりません。\nグループIDを確認するか、新規作成を選択してください。');
                         return;
                     }
+
+                    // ログイン時のみ合言葉を検証（作成時は自分で設定したので検証不要）
+                    if (mode === 'login') {
+                        const storedHash = rDoc.data().h;
+                        const inputHash = CryptoJS.SHA256(loginForm.value.pass).toString();
+                        if (storedHash !== inputHash) {
+                            alert('合言葉が正しくありません');
+                            return;
+                        }
+                    }
+
                     if (rDoc.data().config) {
                         roomConfig.value = { ...roomConfig.value, ...rDoc.data().config };
                     }
