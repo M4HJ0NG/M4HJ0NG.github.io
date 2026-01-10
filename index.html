@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MAHJONG TRACKER V1</title>
+    <title>MAHJONG TRACKER V1.6.5</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -200,6 +200,42 @@
             pointer-events: none;
         }
 
+        /* ローディングオーバーレイ */
+        .loader-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.35);
+            z-index: 3000;
+        }
+
+        .loader-card {
+            background: rgba(255,255,255,0.95);
+            padding: 18px 22px;
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(2,6,23,0.2);
+            text-align: center;
+            min-width: 260px;
+        }
+
+        .loader-bar {
+            height: 8px;
+            background: #e6eef7;
+            border-radius: 999px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .loader-bar > i {
+            display: block;
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            width: 0%;
+            transition: width 150ms linear;
+        }
+
         [v-cloak] {
             display: none;
         }
@@ -209,7 +245,7 @@
 <body>
 
     <div id="app" v-cloak>
-        <div class="version-info">v1.6.3</div>
+        <div class="version-info">v1.6.5</div>
         <div v-if="!currentRoomId" class="container d-flex justify-content-center align-items-center"
             style="min-height: 100vh;">
             <div class="text-center w-100 px-4" style="max-width: 400px;">
@@ -223,6 +259,8 @@
                             :class="authMode==='create'?'bg-white shadow-sm fw-bold':'text-muted'"
                             @click="authMode='create'">新規作成</button>
                     </div>
+
+                    
                     <input type="text" v-model="loginForm.room"
                         class="form-control mb-2 rounded-pill p-3 border-0 bg-light" placeholder="グループID (例: my-team)">
                     <input type="password" v-model="loginForm.pass"
@@ -235,8 +273,8 @@
         </div>
 
         <div v-else class="container pt-3">
-            <div class="d-flex justify-content-between align-items-center mb-3 px-2">
-                <h4 class="fw-black m-0" @click="tab='dashboard'; selectedPlayer=null">RANKING</h4>
+                <div class="d-flex justify-content-between align-items-center mb-3 px-2">
+                <h4 class="fw-black m-0" @click="navigate('dashboard')">RANKING</h4>
                 <div class="badge bg-white text-dark border rounded-pill px-3 py-2 small fw-bold shadow-sm">ID: {{
                     currentRoomId }}</div>
             </div>
@@ -247,6 +285,13 @@
                         <span class="x-small text-muted d-block">平均順位</span>
                         <span class="val-large">{{ globalStats.avgRank }}<small
                                 class="x-small text-muted fw-normal">位</small></span>
+                    </div>
+
+                    <div class="d-flex justify-content-end mb-3">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" :class="{ 'active': statsMode==='all' }" @click="statsMode='all'">全履歴</button>
+                            <button type="button" class="btn btn-outline-secondary" :class="{ 'active': statsMode==='recent' }" @click="statsMode='recent'">直近100戦</button>
+                        </div>
                     </div>
                     <div class="summary-box">
                         <span class="x-small text-muted d-block">平均和了</span>
@@ -282,49 +327,65 @@
                 <div class="card p-4 mb-3 border-0 bg-white shadow-sm">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="fw-bold m-0">{{ selectedPlayer.name }}</h5>
-                        <span class="badge rounded-pill p-2 px-3"
-                            :class="selectedPlayer.totalScore >= 0 ? 'bg-success':'bg-danger'">{{
-                            selectedPlayer.totalScore }} pt</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="btn-group btn-group-sm me-2" role="group">
+                                <button type="button" class="btn btn-outline-secondary" :class="{ 'active': selectedPlayerMode==='all' }" @click="selectedPlayerMode='all'">総合</button>
+                                <button type="button" class="btn btn-outline-secondary" :class="{ 'active': selectedPlayerMode==='recent' }" @click="selectedPlayerMode='recent'">直近100戦</button>
+                            </div>
+                            <span class="badge rounded-pill p-2 px-3"
+                                :class="selectedPlayerDetail.totalScore >= 0 ? 'bg-success':'bg-danger'">{{ selectedPlayerDetail.totalScore }} pt</span>
+                        </div>
                     </div>
 
                     <div class="mb-3 text-center">
-                        <span class="stat-badge text-success">トップ率 {{ selectedPlayer.topRate }}%</span>
-                        <span class="stat-badge text-primary">連対率 {{ selectedPlayer.rentaiRate }}%</span>
-                        <span class="stat-badge text-warning">ラス回避 {{ selectedPlayer.avoidLastRate }}%</span>
+                        <span class="stat-badge text-success">トップ率 {{ selectedPlayerDetail.topRate }}%</span>
+                        <span class="stat-badge text-primary">連対率 {{ selectedPlayerDetail.rentaiRate }}%</span>
+                        <span class="stat-badge text-warning">ラス回避 {{ selectedPlayerDetail.avoidLastRate }}%</span>
                     </div>
 
                     <div class="stat-grid mb-4">
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">対局数</small>
-                            <strong class="h5 m-0">{{ selectedPlayer.games }}</strong>
+                            <strong class="h5 m-0">{{ selectedPlayerDetail.games }}</strong>
                         </div>
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">平均着順</small>
-                            <strong class="h5 m-0">{{ selectedPlayer.avgRank }}<small
+                            <strong class="h5 m-0">{{ selectedPlayerDetail.avgRank }}<small
                                     class="fs-6 fw-normal">位</small></strong>
                         </div>
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">平均収支</small>
-                            <strong class="h5 m-0"
-                                :class="selectedPlayer.avgScorePerGame>=0?'text-success':'text-danger'">{{
-                                selectedPlayer.avgScorePerGame }}</strong>
+                            <strong class="h5 m-0" :class="selectedPlayerDetail.avgScorePerGame>=0?'text-success':'text-danger'">{{ selectedPlayerDetail.avgScorePerGame }}</strong>
                         </div>
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">和了率</small>
-                            <strong class="h5 m-0">{{ selectedPlayer.winRate }}%</strong>
+                            <strong class="h5 m-0">{{ selectedPlayerDetail.winRate }}%</strong>
                         </div>
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">放銃率</small>
-                            <strong class="h5 m-0 text-danger">{{ selectedPlayer.loseRate }}%</strong>
+                            <strong class="h5 m-0 text-danger">{{ selectedPlayerDetail.loseRate }}%</strong>
                         </div>
                         <div class="stat-item">
                             <small class="text-muted d-block x-small">最大打点</small>
-                            <strong class="h5 m-0 text-primary">{{ selectedPlayer.maxHand }}</strong>
+                            <strong class="h5 m-0 text-primary">{{ selectedPlayerDetail.maxHand }}</strong>
                         </div>
                     </div>
 
                     <h6 class="fw-bold x-small text-muted mb-2">役分布 (Top 5)</h6>
                     <div style="height: 200px;"><canvas id="yakuPieChart"></canvas></div>
+                    <div v-if="selectedPlayerMode==='all'" class="mt-3">
+                        <div class="small text-muted mb-2">総合集計はDBの `stats` を利用しています。個別対局はページ単位で読み込んで確認できます。</div>
+                        <div class="d-flex gap-2 mb-2">
+                            <button class="btn btn-sm btn-outline-primary" @click="loadPlayerGamesReset" :disabled="playerGamesLoading">履歴を読み込む</button>
+                            <button v-if="playerGames.length" class="btn btn-sm btn-outline-secondary" @click="loadPlayerGamesNext" :disabled="playerGamesLoading || !playerGamesHasMore">もっと読む</button>
+                        </div>
+                        <div v-if="playerGamesLoading" class="small text-muted mb-2">読み込み中…</div>
+                        <div v-for="g in playerGames" :key="g.id" class="bg-light p-2 rounded-2 mb-1 small d-flex justify-content-between">
+                            <div>{{ formatDate(g.d) }} <span class="text-muted">({{ g.p.join(', ') }})</span></div>
+                            <div class="fw-bold" :class="g.s[g.p.indexOf(selectedPlayer.name)]>=0? 'text-success':'text-danger'">{{ g.s[g.p.indexOf(selectedPlayer.name)] }}</div>
+                        </div>
+                        <div v-if="!playerGames.length && !playerGamesLoading" class="small text-muted">まだ読み込まれていません</div>
+                    </div>
                 </div>
             </div>
 
@@ -354,6 +415,14 @@
                                 @click="resetInput">リセット</button>
                         </div>
                     </div>
+
+                        <div class="mb-3">
+                            <div v-if="sumMismatch !== 0" class="alert alert-warning small py-2 d-flex justify-content-between align-items-center">
+                                <div>合計点が素点合計と異なります。差分: <strong>{{ sumMismatch }}</strong> 点</div>
+                                <div class="text-muted">現在: {{ sumRaw }} / 期待: {{ expectedSum }}</div>
+                            </div>
+                            <div v-else class="small text-muted mb-2">合計は素点と一致しています ({{ expectedSum }} 点)</div>
+                        </div>
 
                     <div class="row g-2 mb-4">
                         <div v-for="(p, i) in inputForm.players" :key="i" class="col-6">
@@ -461,6 +530,11 @@
                             <label class="x-small text-muted">オカ (Top賞)</label>
                             <input type="number" v-model.number="roomConfig.oka"
                                 class="form-control form-control-sm bg-light border-0" placeholder="20">
+                        </div>
+                        <div class="col-6">
+                            <label class="x-small text-muted">素点 (開始時の持ち点)</label>
+                            <input type="number" v-model.number="roomConfig.startingPoints"
+                                class="form-control form-control-sm bg-light border-0" placeholder="25000">
                         </div>
                         <div class="col-12">
                             <label class="x-small text-muted">ウマ (10-20形式 または 20,10,-10,-20)</label>
@@ -623,17 +697,36 @@
 
             <nav class="nav-bottom">
                 <button class="nav-item" :class="{active: tab==='dashboard'}"
-                    @click="tab='dashboard'; selectedPlayer=null"><i class="bi bi-house-door-fill"></i></button>
+                    @click="navigate('dashboard')"><i class="bi bi-house-door-fill"></i></button>
                 <button class="nav-item" :class="{active: tab==='history'}"
-                    @click="tab='history'; selectedPlayer=null"><i class="bi bi-clock-history"></i></button>
-                <button class="nav-item" @click="tab='input'; selectedPlayer=null">
+                    @click="navigate('history')"><i class="bi bi-clock-history"></i></button>
+                <button class="nav-item" @click="navigate('input')">
                     <div class="btn-plus-fixed"><i class="bi bi-plus-lg"></i></div>
                 </button>
-                <button class="nav-item" :class="{active: tab==='chart'}" @click="tab='chart'; selectedPlayer=null"><i
+                <button class="nav-item" :class="{active: tab==='chart'}" @click="navigate('chart')"><i
                         class="bi bi-graph-up-arrow"></i></button>
                 <button class="nav-item" :class="{active: tab==='settings'}"
-                    @click="tab='settings'; selectedPlayer=null"><i class="bi bi-gear-wide-connected"></i></button>
+                    @click="navigate('settings')"><i class="bi bi-gear-wide-connected"></i></button>
             </nav>
+
+            <!-- ローディングオーバーレイ -->
+            <div v-if="isLoading" class="loader-overlay">
+                <div class="loader-card">
+                    <div class="fw-bold">読み込み中</div>
+                    <div class="small text-muted mt-1">読み込み: {{ Math.round(loadingProgress) }}%</div>
+                    <div class="loader-bar"><i :style="{width: loadingProgress + '%'}"></i></div>
+                </div>
+            </div>
+            
+            <!-- 保存成功トースト -->
+            <div class="position-fixed bottom-0 end-0 p-3" style="z-index:4000">
+                <div id="saveToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">保存しました</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="閉じる"></button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -644,7 +737,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, orderBy, limit, addDoc, deleteDoc, where, startAfter } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
         const firebaseConfig = { apiKey: "AIzaSyCirgTEpzDFnM-wvLI69F-w1EVndMtEK7g", authDomain: "mahjongstorage-836e8.firebaseapp.com", projectId: "mahjongstorage-836e8", storageBucket: "mahjongstorage-836e8.firebasestorage.app", messagingSenderId: "618604764916", appId: "1:618604764916:web:9ca128c3e76a7cb3e248a1" };
@@ -685,7 +778,7 @@
                 const loginForm = ref({ room: '', pass: '' });
                 const games = ref([]); // 直近のゲームリスト (最大100)
                 const masterStats = ref({}); // 集計済み統計データ（DBから取得）
-                const roomConfig = ref({ kaeshi: 30000, oka: 20, uma: '10-20', doubleYakuman: true, kiriage: false, localYaku: false });
+                const roomConfig = ref({ kaeshi: 30000, oka: 20, uma: '10-20', startingPoints: 25000, doubleYakuman: true, kiriage: false, localYaku: false });
 
                 const toLocalISO = () => {
                     const now = new Date();
@@ -707,31 +800,71 @@
                 const chartMode = ref('top4');
                 let lineChart = null, pieChart = null;
 
+                // ローディング表示（画面遷移用）
+                const isLoading = ref(false);
+                const loadingProgress = ref(0);
+
+                // ダッシュボードの統計モード: 'all' (全履歴: masterStats) / 'recent' (直近100戦: gamesから算出)
+                const statsMode = ref('all');
+
                 // --- 統計処理 ---
                 // 従来の games 配列からの計算ではなく、masterStats（永続化された集計データ）を表示用に加工する
+                // games配列から統計オブジェクトを生成する（直近N戦用）
+                const computeStatsFromGames = (gameArray) => {
+                    const stats = {};
+                    gameArray.forEach(g => updateStatsObject(stats, g));
+                    return stats;
+                };
+
+                // ローディング制御
+                let _loadingInterval = null;
+                const startLoading = (targetMs = 600) => {
+                    isLoading.value = true;
+                    loadingProgress.value = 6;
+                    if (_loadingInterval) clearInterval(_loadingInterval);
+                    _loadingInterval = setInterval(() => {
+                        // 徐々に進めるが100%までは行かない（処理完了時に100%にする）
+                        loadingProgress.value = Math.min(95, loadingProgress.value + Math.random() * 12);
+                    }, Math.max(80, targetMs / 8));
+                };
+                const stopLoading = () => {
+                    loadingProgress.value = 100;
+                    if (_loadingInterval) { clearInterval(_loadingInterval); _loadingInterval = null; }
+                    setTimeout(() => { isLoading.value = false; loadingProgress.value = 0; }, 160);
+                };
+
+                // 画面遷移（ローディング表示付き）
+                const navigate = (to) => {
+                    if (tab.value === to) return;
+                    startLoading(400);
+                    setTimeout(() => {
+                        tab.value = to;
+                        selectedPlayer.value = null;
+                        stopLoading();
+                    }, 420);
+                };
+
                 const displayStats = computed(() => {
-                    const s = Object.values(masterStats.value);
-                    // データがない場合は空配列
+                    // statsMode に応じてデータソースを切り替え
+                    const source = statsMode.value === 'all' ? masterStats.value : computeStatsFromGames(games.value);
+                    const s = Object.values(source || {});
                     if (!s.length) return [];
 
                     return s.sort((a, b) => b.totalScore - a.totalScore).map(stat => {
-                        const games = stat.games || 0;
-                        const rankCounts = stat.rankCounts || [0, 0, 0, 0]; // [1位回数, 2位, 3位, 4位]
+                        const gamesCnt = stat.games || 0;
+                        const rankCounts = stat.rankCounts || [0, 0, 0, 0];
                         const rankSum = stat.rankSum || 0;
 
                         return {
                             ...stat,
-                            games,
-                            avgRank: games ? (rankSum / games).toFixed(2) : 0,
-                            avgScorePerGame: games ? (stat.totalScore / games).toFixed(1) : 0,
-
-                            // 追加指標
-                            winRate: games ? ((stat.winCount / (games * 10)) * 100).toFixed(1) : 0, // ※和了率等の分母は概算(1半荘10局想定)のまま維持
-                            loseRate: games ? ((stat.loseCount / (games * 10)) * 100).toFixed(1) : 0,
-                            topRate: games ? ((rankCounts[0] / games) * 100).toFixed(1) : 0,
-                            rentaiRate: games ? (((rankCounts[0] + rankCounts[1]) / games) * 100).toFixed(1) : 0,
-                            avoidLastRate: games ? (((games - rankCounts[3]) / games) * 100).toFixed(1) : 0,
-
+                            games: gamesCnt,
+                            avgRank: gamesCnt ? (rankSum / gamesCnt).toFixed(2) : 0,
+                            avgScorePerGame: gamesCnt ? (stat.totalScore / gamesCnt).toFixed(1) : 0,
+                            winRate: gamesCnt ? ((stat.winCount / (gamesCnt * 10)) * 100).toFixed(1) : 0,
+                            loseRate: gamesCnt ? ((stat.loseCount / (gamesCnt * 10)) * 100).toFixed(1) : 0,
+                            topRate: gamesCnt ? ((rankCounts[0] / gamesCnt) * 100).toFixed(1) : 0,
+                            rentaiRate: gamesCnt ? (((rankCounts[0] + rankCounts[1]) / gamesCnt) * 100).toFixed(1) : 0,
+                            avoidLastRate: gamesCnt ? (((gamesCnt - rankCounts[3]) / gamesCnt) * 100).toFixed(1) : 0,
                             avgHand: stat.totalHands ? Math.round(stat.handSum / stat.totalHands) : 0,
                             avgLoseScore: stat.loseCount ? Math.round(stat.loseSum / stat.loseCount) : 0,
                             totalScore: parseFloat(stat.totalScore.toFixed(1)),
@@ -833,13 +966,17 @@
 
                 // --- アクション ---
                 const joinRoom = async (mode) => {
+                    // ロード表示開始
+                    startLoading();
                     await signInAnonymously(auth);
                     const roomName = loginForm.value.room;
                     if (!roomName) {
+                        stopLoading();
                         alert('グループIDを入力してください');
                         return;
                     }
                     if (!loginForm.value.pass) {
+                        stopLoading();
                         alert('合言葉を入力してください');
                         return;
                     }
@@ -897,6 +1034,7 @@
                         // 競合対策: mergeオプションを使用
                         await rebuildStatsFromLoadedGames();
                     }
+                    stopLoading();
                 };
 
                 // データ整合性チェック＆自動修復関数
@@ -1069,6 +1207,14 @@
                 const saveGame = async () => {
                     if (!confirm("結果を保存しますか？")) return;
 
+                    // 素点合計の確認
+                    const expectedSum = (roomConfig.value.startingPoints || 25000) * 4;
+                    const currentSum = inputForm.value.rawScores.reduce((a, b) => a + Number(b || 0), 0);
+                    const diff = currentSum - expectedSum;
+                    if (diff !== 0) {
+                        if (!confirm(`合計点が素点合計と異なります。差分: ${diff} 点。続行しますか？`)) return;
+                    }
+
                     let umaStr = roomConfig.value.uma || "10-20";
                     let u = [0, 0, 0, 0];
                     if (umaStr.includes(',')) {
@@ -1132,7 +1278,15 @@
                         }
 
                         resetInput();
-                        tab.value = 'dashboard';
+                        navigate('dashboard');
+                        // 保存成功トースト表示
+                        try {
+                            const toastEl = document.getElementById('saveToast');
+                            if (toastEl) {
+                                const bsToast = new bootstrap.Toast(toastEl);
+                                bsToast.show();
+                            }
+                        } catch (e) { /* ignore */ }
                     } catch (e) {
                         console.error(e);
                         alert("保存に失敗しました");
@@ -1271,11 +1425,91 @@
                 };
 
                 watch([tab, chartMode], () => { if (tab.value === 'chart') nextTick(() => setTimeout(renderLineChart, 200)); });
+                const sumRaw = computed(() => inputForm.value.rawScores.reduce((a, b) => a + Number(b || 0), 0));
+                const expectedSum = computed(() => (roomConfig.value.startingPoints || 25000) * 4);
+                const sumMismatch = computed(() => sumRaw.value - expectedSum.value);
+                // 選択中プレイヤー用の表示モード（総合 / 直近100戦）
+                const selectedPlayerMode = ref('all');
+                const selectedPlayerDetail = computed(() => {
+                    if (!selectedPlayer.value) return { name: '', games: 0, totalScore: 0, rankCounts: [0,0,0,0], rankSum:0, winCount:0, loseCount:0, totalHands:0, handSum:0, loseSum:0, maxHand:0, yakuMap: {}, yakuMapSorted: {}, avgRank:0, avgScorePerGame:0, winRate:0, loseRate:0, topRate:0, rentaiRate:0, avoidLastRate:0 };
+                    const name = selectedPlayer.value.name;
+                    const source = selectedPlayerMode.value === 'all' ? masterStats.value : computeStatsFromGames(games.value);
+                    const s = (source && source[name]) ? source[name] : { name, games:0, totalScore:0, rankCounts:[0,0,0,0], rankSum:0, winCount:0, loseCount:0, totalHands:0, handSum:0, loseSum:0, maxHand:0, yakuMap: {} };
+                    const gamesCnt = s.games || 0;
+                    const rankCounts = s.rankCounts || [0,0,0,0];
+                    const rankSum = s.rankSum || 0;
+                    return {
+                        ...s,
+                        games: gamesCnt,
+                        avgRank: gamesCnt ? (rankSum / gamesCnt).toFixed(2) : 0,
+                        avgScorePerGame: gamesCnt ? (s.totalScore / gamesCnt).toFixed(1) : 0,
+                        winRate: gamesCnt ? ((s.winCount / (gamesCnt * 10)) * 100).toFixed(1) : 0,
+                        loseRate: gamesCnt ? ((s.loseCount / (gamesCnt * 10)) * 100).toFixed(1) : 0,
+                        topRate: gamesCnt ? ((rankCounts[0] / gamesCnt) * 100).toFixed(1) : 0,
+                        rentaiRate: gamesCnt ? (((rankCounts[0] + rankCounts[1]) / gamesCnt) * 100).toFixed(1) : 0,
+                        avoidLastRate: gamesCnt ? (((gamesCnt - rankCounts[3]) / gamesCnt) * 100).toFixed(1) : 0,
+                        avgHand: s.totalHands ? Math.round(s.handSum / s.totalHands) : 0,
+                        avgLoseScore: s.loseCount ? Math.round(s.loseSum / s.loseCount) : 0,
+                        totalScore: parseFloat((s.totalScore || 0).toFixed ? s.totalScore.toFixed(1) : (s.totalScore || 0)),
+                        yakuMapSorted: s.yakuMap ? Object.fromEntries(Object.entries(s.yakuMap).sort(([, a], [, b]) => b - a)) : {}
+                    };
+                });
+
+                // 切替時にチャートを再描画
+                watch([selectedPlayerMode, selectedPlayer], () => { if (selectedPlayer.value) nextTick(() => setTimeout(() => renderPieChart(selectedPlayerDetail.value), 200)); });
+
+                watch([tab, chartMode], () => { if (tab.value === 'chart') nextTick(() => setTimeout(renderLineChart, 200)); });
+
+                // 選択中プレイヤー用の履歴ページング（全履歴が大きい場合の対策）
+                const playerGames = ref([]);
+                const playerGamesLastDoc = ref(null);
+                const playerGamesLoading = ref(false);
+                const playerGamesHasMore = ref(true);
+                const playerGamesPageSize = 20;
+
+                const loadPlayerGamesReset = async () => {
+                    playerGames.value = [];
+                    playerGamesLastDoc.value = null;
+                    playerGamesHasMore.value = true;
+                    await loadPlayerGamesNext();
+                };
+
+                const loadPlayerGamesNext = async () => {
+                    if (!currentRoomId.value || !selectedPlayer.value) return;
+                    if (playerGamesLoading.value || !playerGamesHasMore.value) return;
+                    playerGamesLoading.value = true;
+                    try {
+                        const name = selectedPlayer.value.name;
+                        const collRef = collection(db, "rooms", currentRoomId.value, "g");
+                        let qRef;
+                        if (playerGamesLastDoc.value) {
+                            qRef = query(collRef, where("p", "array-contains", name), orderBy("d", "desc"), startAfter(playerGamesLastDoc.value), limit(playerGamesPageSize));
+                        } else {
+                            qRef = query(collRef, where("p", "array-contains", name), orderBy("d", "desc"), limit(playerGamesPageSize));
+                        }
+                        const snap = await getDocs(qRef);
+                        if (!snap.empty) {
+                            const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                            playerGames.value.push(...docs);
+                            playerGamesLastDoc.value = snap.docs[snap.docs.length - 1];
+                            if (snap.docs.length < playerGamesPageSize) playerGamesHasMore.value = false;
+                        } else {
+                            playerGamesHasMore.value = false;
+                        }
+                    } catch (e) {
+                        console.error('playerGames load error', e);
+                    } finally {
+                        playerGamesLoading.value = false;
+                    }
+                };
 
                 return {
                     currentRoomId, authMode, tab, loginForm, games, roomConfig, displayStats, globalStats, inputForm, handForm, showHandModal, selectedPlayer, chartMode, registeredPlayers,
+                    isLoading, loadingProgress, statsMode, sumRaw, expectedSum, sumMismatch,
+                    selectedPlayerMode, selectedPlayerDetail,
+                    playerGames, playerGamesLoading, playerGamesHasMore, loadPlayerGamesReset, loadPlayerGamesNext,
                     joinRoom, saveGame, toggleYaku, changeDoraCount, resetInput, filteredYaku, calculatedResult, canSelectYaku, addHandLog, openHandModal,
-                    openPlayerDetail: (p) => { selectedPlayer.value = p; nextTick(() => setTimeout(() => renderPieChart(p), 200)); },
+                    navigate, openPlayerDetail: (p) => { selectedPlayer.value = p; selectedPlayerMode.value = statsMode.value || 'all'; nextTick(() => setTimeout(() => renderPieChart(selectedPlayerDetail.value), 200)); },
                     formatDate: (ts) => new Date(ts).toLocaleDateString(),
                     logout: () => location.reload()
                 };
